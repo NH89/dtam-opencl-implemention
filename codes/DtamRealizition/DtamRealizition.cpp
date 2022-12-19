@@ -1,6 +1,6 @@
 // DtamRealizition.cpp : 定义控制台应用程序的入口点。
 //
-#include "stdafx.h"
+#include "stdafx.h"   // windows precompiled header file
 #include <boost/filesystem.hpp>
 #include "CostVol.h"
 
@@ -29,7 +29,7 @@ int main()
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;
 	double reconstructionScale = 1;
 	int inc = 1;
-	for (int i =0; i < 11; i += inc) {
+	for (int i =0; i < 11; i += inc) {                                             // Load images & data from file into c++ vectors
 		Mat tmp, d, image;
 		int offset = 0;
 		loadAhanda("D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
@@ -57,15 +57,15 @@ int main()
 	float occlusionThreshold = .05;
 
 	int startAt = 0;
-
+                                                                                   // Instantiate CostVol ///////////
 	CostVol cv(images[startAt], (FrameID)startAt, layers, 0.015, 0.0, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold);
 	cout << "calculate cost volume: " << endl;
 
-	for (int imageNum = 1; imageNum < 10; imageNum++)
+	for (int imageNum = 1; imageNum < 10; imageNum++)                              // Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 
 	cout << "cacheGValues: " << endl;
-	cv.cacheGValues();
+	cv.cacheGValues();                                                             // cacheGValues()  elementwise weighting on keframe image gradient
 
 	cout << "optimizing: " << endl;
 	bool doneOptimizing;
@@ -73,8 +73,8 @@ int main()
 	do
 	{
 		for (int i = 0; i < 10; i++)
-			cv.updateQD();
-		doneOptimizing = cv.updateA();
+			cv.updateQD();                                                         // Optimize Q, D   (primal-dual)
+		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
 	} while (!doneOptimizing);
 
 	cout << "done: " << endl;
@@ -84,14 +84,14 @@ int main()
 	cv::Mat depthImg;
 	cv::namedWindow("depthmap", 1);
 
-	cv.GetResult();
-    depthMap = cv._a;
+	cv.GetResult();                                                                // GetResult /////////////////////
+    depthMap = cv._a;                                                              // depthMap = cv._a
 
 	cv::minMaxIdx(depthMap, &min, &max);
 	std::cout << "Max: " << max << " Min: " << min << std::endl;
 	depthMap.convertTo(depthImg, CV_8U, 255 / max, 0);
 	medianBlur(depthImg, depthImg, 3);
-	cv::imshow("depthmap", depthImg);
+	cv::imshow("depthmap", depthImg);                                             //cv::imshow("depthmap", depthImg);
 	cv::waitKey(-1);
 	return 0;
 }

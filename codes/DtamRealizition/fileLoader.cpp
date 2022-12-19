@@ -1,9 +1,9 @@
 // loads all files of a given name and extension
-#include "stdafx.h"
+#include "stdafx.h"     // windows precompiled header file
 #include "fileLoader.hpp"
 #include <boost/filesystem.hpp>
 #include <fstream>
-#include <comdef.h>	
+#include <comdef.h>	    // part of MS Platform SDK
 
     using namespace cv;
     using namespace std;

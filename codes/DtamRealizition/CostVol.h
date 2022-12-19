@@ -41,7 +41,9 @@ public:
 
 	cv::Mat projection;//projects world coordinates (x,y,z) into (rows,cols,layers)
 	cv::Mat baseImage, baseImageGray;
+    /*
     //cv::Mat _qx, _qy, _d, _a, _g, _gu, _gd, _gl, _gr, _gbig;
+    */
 	cv::Mat _qx, _qy, _d, _a, _g, _g1, _gx, _gy, lo, hi;
 	Mat costdata, hit;
 	int count, QDruncount, Aruncount;
@@ -52,11 +54,11 @@ public:
 		 float initialCost = 3.0, float initialWeight = .001);
 
 	void initOptimization();
-
+    /*
 	//void optimizeQD();
 
 	//bool optimizeA();
-
+    */
 	void updateQD();
 
 	bool updateA();

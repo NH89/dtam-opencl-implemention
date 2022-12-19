@@ -65,7 +65,7 @@ public:
 	}
 
 	void calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
-	
+    /*	
 //	void minv(float *loInd, float *loVal, int layers);
 	 
 	//void optiQ(float sigma_q,float epsilon,float denom);
@@ -73,6 +73,7 @@ public:
 	//void optiD(float sigma_d,float epsilon,float denom, float theta);
 
 	//void optiA(float theta,float ds,float lamda,int l,int layerstep);
+    */
 	
 	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
  

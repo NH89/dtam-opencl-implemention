@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "stdafx.h"     // windows precompiled header file
 #include "CostVol.h"
 //#include <opencv2/core/operations.hpp>
 #include <fstream>
@@ -20,6 +20,7 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 	//fx 0  cx 
 	//0  fy cy 
 	//0  0  1  
+    
 	projection.create(4, 4, CV_64FC1);
 	projection = 0.0;
 	projection(Range(0, 2), Range(0, 3)) += cameraMatrix.rowRange(0, 2);
@@ -31,7 +32,6 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 
 	projection.at<double>(2, 3) = 1.0;
 	projection.at<double>(3, 2) = 1.0;
-
 	//Projection: Takes camera coordinates to pixel coordinates:x_px,y_px,1/zc
 	//fx 0  cx 0
 	//0  fy cy 0
@@ -50,14 +50,18 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 							  // exit(0);
 }
 
-void CostVol::checkInputs(const cv::Mat& R, const cv::Mat& T,
+void CostVol::checkInputs(
+    const cv::Mat& R, 
+    const cv::Mat& T,
 	const cv::Mat& _cameraMatrix) {
+    
 	assert(R.size() == Size(3, 3));
 	assert(R.type() == CV_64FC1);
 	assert(T.size() == Size(1, 3));
 	assert(T.type() == CV_64FC1);
 	assert(_cameraMatrix.size() == Size(3, 3));
 	assert(_cameraMatrix.type() == CV_64FC1);
+    
 	CV_Assert(_cameraMatrix.at<double>(2, 0) == 0.0);
 	CV_Assert(_cameraMatrix.at<double>(2, 1) == 0.0);
 	CV_Assert(_cameraMatrix.at<double>(2, 2) == 1.0);
@@ -75,19 +79,23 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	//     CV_Assert(_layers>=8);
 
 	checkInputs(R, T, _cameraMatrix);
-	fid = _fid;
-	rows = image.rows;
-	cols = image.cols;
+	fid    = _fid;
+	rows   = image.rows;
+	cols   = image.cols;
 	layers = _layers;
-	near = _near;
-	far = _far;
-	depthStep = (near - far) / (layers - 1);
+	near   = _near;
+	far    = _far;
+    
+	depthStep    = (near - far) / (layers - 1);
 	cameraMatrix = _cameraMatrix.clone();
+    
 	solveProjection(R, T);
+    
 	costdata = Mat::zeros(layers, rows * cols, CV_32FC1);
 	costdata = initialCost;
-	hit = Mat::zeros(layers, rows * cols, CV_32FC1);
-	hit = initialWeight;
+    
+	hit      = Mat::zeros(layers, rows * cols, CV_32FC1);
+	hit      = initialWeight;
 	
 	FLATALLOC(lo);
 	FLATALLOC(hi);
@@ -98,74 +106,89 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	FLATALLOC(_qx);
     FLATALLOC(_qy);
     FLATALLOC(_g1);
-	_qx = _qy  = 0;
-	_gx = _gy = 1;
-	cvrc.width = cols;
+    
+	_qx = _qy   = 0;
+	_gx = _gy   = 1;
+	cvrc.width  = cols;
 	cvrc.height = rows;
-	cvrc.allocatemem((float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data);
+    
+	cvrc.allocatemem( (float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data );
 
 	image.copyTo(baseImage);
 	baseImage = baseImage.reshape(0, rows);
+    
 	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
 	baseImageGray = baseImageGray.reshape(0, rows);
-	count = 0;
 	
-	float off = layers / 32;
+    count      = 0;
+	float off  = layers / 32;
 	thetaStart = 200.0*off;
-	thetaMin = 1.0*off;
-	thetaStep = .97;
-	epsilon = .1*off;
-	lambda = .001 / off;
-	theta = thetaStart;
+	thetaMin   = 1.0*off;
+	thetaStep  = .97;
+	epsilon    = .1*off;
+	lambda     = .001 / off;
+	theta      = thetaStart;
 
 	QDruncount = 0;
-	Aruncount = 0;
+	Aruncount  = 0;
 
 	alloced = 0;
 	cachedG = 0;
 	dInited = 0;
 }
 
+
 void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T) 
 {
 	Mat image;
 	_image.copyTo(image);
-	//find projection matrix from cost volume to image (3x4)
+                                                                        //find projection matrix from cost volume to image (3x4)
 	Mat viewMatrixImage;
 	RTToP(R, T, viewMatrixImage);
 	Mat cameraMatrixTex(3, 4, CV_64FC1);
+    
 	cameraMatrixTex = 0.0;
 	cameraMatrix.copyTo(cameraMatrixTex(Range(0, 3), Range(0, 3)));
-	cameraMatrixTex(Range(0, 2), Range(2, 3)) += 0.5;//add 0.5 to x,y out //removing causes crash
-	Mat imFromWorld = cameraMatrixTex*viewMatrixImage;//3x4
-	Mat imFromCV = imFromWorld*projection.inv();
-	assert(baseImage.isContinuous());
-	assert(lo.isContinuous());
-	assert(hi.isContinuous());
+	cameraMatrixTex(Range(0, 2), Range(2, 3)) += 0.5;                   //add 0.5 to x,y out //removing causes crash
 	
+	Mat imFromWorld = cameraMatrixTex * viewMatrixImage;                //3x4  matrix
+	Mat imFromCV    = imFromWorld * projection.inv();
+    
+	assert(baseImage.isContinuous() );
+	assert(lo.isContinuous() );
+	assert(hi.isContinuous() );
+    
 	double *p = (double*)imFromCV.data;
 	float persp[12];
-	for (int i = 0; i<12; i++) persp[i] = p[i];
+	for (int i = 0; i<12; i++) {
+        persp[i] = p[i]; 
+    }
 	image = image.reshape(0, rows);
-	
+	/*
 	//memcpy(costd, (float*)costdata.data, st);
 	//float* hitd = (float*)malloc(st);
 	//memcpy(hitd, (float*)hit.data, st);
-	
+	*/
+                                                                        // calls calcCostVol(..) ###############################
 	cvrc.calcCostVol(persp, baseImage, image, (float*)costdata.data, (float*)hit.data, occlusionThreshold, layers);
-	//memcpy(hit.data, hitd, st);
-	/*size_t st = rows * cols * layers * sizeof(float);
+	/*
+    //memcpy(hit.data, hitd, st);
+	
+    size_t st = rows * cols * layers * sizeof(float);
 	float* costd = (float*)malloc(st);
 	memcpy(costd ,costdata.data, st);
 
 	double min = 0, max = 0;
-	minMaxIdx(costdata, &min, &max);*/
+	minMaxIdx(costdata, &min, &max);
+	*/
 }
+
 
 void CostVol::cacheGValues()
 {
 	cvrc.cacheGValue(baseImageGray);
 }
+
 
 void CostVol::updateQD()
 {
@@ -173,6 +196,7 @@ void CostVol::updateQD()
 
 	cvrc.updateQD(epsilon, theta, sigma_q, sigma_d);
 }
+
 
 bool CostVol::updateA()
 {
@@ -184,6 +208,7 @@ bool CostVol::updateA()
 
 	return doneOptimizing;
 }
+
 
 void CostVol::GetResult()
 {

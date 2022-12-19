@@ -1,13 +1,13 @@
-#include "stdafx.h"
+#include "stdafx.h"  // windows precompiled header file
 #include "RunCL.h"
 
 #define SDK_SUCCESS 0
 #define SDK_FAILURE 1
 using namespace std;
 
-RunCL::RunCL()
+RunCL::RunCL() // constructor
 {
-	/*Step1: Getting platforms and choose an available one.*/
+	/*Step1: Getting platforms and choose an available one.*////////////////////////////////////////////////////////////
 	cl_uint numPlatforms;	//the NO. of platforms
 	cl_platform_id platform = NULL;	//the chosen platform
 	cl_int	status = clGetPlatformIDs(0, NULL, &numPlatforms);
@@ -26,7 +26,7 @@ RunCL::RunCL()
 		free(platforms);
 	}
 
-	/*Step 2:Query the platform and choose the first GPU device if has one.Otherwise use the CPU as device.*/
+	/*Step 2:Query the platform and choose the first GPU device if has one.Otherwise use the CPU as device.*/////////////
 	cl_uint				numDevices = 0;
 	cl_device_id        *devices;
 	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
@@ -45,7 +45,7 @@ RunCL::RunCL()
 	}
 
 
-	/*Step 3: Create context.*/
+	/*Step 3: Create context.*///////////////////////////////////////////////////////////////////////////////////////////
 	 cl_context_properties cps[3] =
 	{
 		CL_CONTEXT_PLATFORM,
@@ -67,7 +67,7 @@ RunCL::RunCL()
 													prop,
 													&status);
 
-	/*Step 5: Create program object */
+	/*Step 5: Create program object *////////////////////////////////////////////////////////////////////////////////////
 	const char *filename = "DTAM_kernels2.cl";
 	string sourceStr;
 	status = convertToString(filename, sourceStr);
@@ -75,7 +75,7 @@ RunCL::RunCL()
 	size_t sourceSize[] = { strlen(source) };
 	m_program = clCreateProgramWithSource(m_context, 1, &source, sourceSize, NULL);
 
-	/*Step 6: Build program. */
+	/*Step 6: Build program. *///////////////////////////////////////////////////////////////////////////////////////////
 	status = clBuildProgram(m_program, 1, devices, NULL, NULL, NULL);
 	
 	if (status != CL_SUCCESS)
@@ -86,18 +86,21 @@ RunCL::RunCL()
 		printf("\n%s\n", buf);
 		return;
 	}
-	//*Step 7: Create kernel object. */
+	//*Step 7: Create kernel object. *///////////////////////////////////////////////////////////////////////////////////
 	cost_kernel = clCreateKernel(m_program, "BuildCostVolume", NULL);
+    /*
 	//min_kernel = clCreateKernel(m_program, "CostMin", NULL);
 	//optiQ_kernel = clCreateKernel(m_program, "OptimizeQ", NULL);
 	//optiD_kernel = clCreateKernel(m_program, "OptimizeD", NULL);
 	//optiA_kernel = clCreateKernel(m_program, "OptimizeA", NULL);
-	cache1_kernel = clCreateKernel(m_program, "CacheG1", NULL);
-	cache2_kernel = clCreateKernel(m_program, "CacheG2", NULL);
+    */
+	cache1_kernel = clCreateKernel(m_program,  "CacheG1", NULL);
+	cache2_kernel = clCreateKernel(m_program,  "CacheG2", NULL);
 	updateQ_kernel = clCreateKernel(m_program, "UpdateQ", NULL);
 	updateD_kernel = clCreateKernel(m_program, "UpdateD", NULL);
 	updateA_kernel = clCreateKernel(m_program, "UpdateA", NULL);
 }
+
 
 void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers)
 {
@@ -124,7 +127,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 			CL_FALSE,
 			0,
 			width * height * pixelSize,
-			baseImage.data,
+			baseImage.data, /////////////////////////
 			0,
 			NULL,
 			&writeEvt);
@@ -133,7 +136,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 			CL_FALSE,
 			0,
 			width * height * pixelSize,
-			image.data,
+			image.data, /////////////////////////////
 			0,
 			NULL,
 			&writeEvt);
@@ -143,7 +146,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 			CL_FALSE,
 			0,
 			width * height * layers * sizeof(float),
-			cdata,
+			cdata, //////////////////////////////////
 			0,
 			NULL,
 			&writeEvt);
@@ -153,7 +156,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 			CL_FALSE,
 			0,
 			width * height * layers * sizeof(float),
-			hdata,
+			hdata, //////////////////////////////////
 			0,
 			NULL,
 			&writeEvt);
@@ -163,7 +166,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 			CL_FALSE,
 			0,
 			12 * sizeof(float),
-			p,
+			p, //////////////////////////////////////
 			0,
 			NULL,
 			&writeEvt);
@@ -172,24 +175,24 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		int layerstep = width * height;
 		global_work_size = layerstep;
 		// set kernelArg
-		res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem), &pbuf);
-		res = clSetKernelArg(cost_kernel, 1, sizeof(cl_mem), &basemem);
-		res = clSetKernelArg(cost_kernel, 2, sizeof(cl_mem), &imgmem);
-		res = clSetKernelArg(cost_kernel, 3, sizeof(cl_mem), &cdatabuf);
-		res = clSetKernelArg(cost_kernel, 4, sizeof(cl_mem), &hdatabuf);
-		res = clSetKernelArg(cost_kernel, 5, sizeof(int), &layerstep);
-		res = clSetKernelArg(cost_kernel, 6, sizeof(float), &thresh);
-		res = clSetKernelArg(cost_kernel, 7, sizeof(int), &width);
-		res = clSetKernelArg(cost_kernel, 8, sizeof(cl_mem), &lomem);
-		res = clSetKernelArg(cost_kernel, 9, sizeof(cl_mem), &himem);
+		res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem),  &pbuf);
+		res = clSetKernelArg(cost_kernel, 1, sizeof(cl_mem),  &basemem);
+		res = clSetKernelArg(cost_kernel, 2, sizeof(cl_mem),  &imgmem);
+		res = clSetKernelArg(cost_kernel, 3, sizeof(cl_mem),  &cdatabuf);
+		res = clSetKernelArg(cost_kernel, 4, sizeof(cl_mem),  &hdatabuf);
+		res = clSetKernelArg(cost_kernel, 5, sizeof(int),     &layerstep);
+		res = clSetKernelArg(cost_kernel, 6, sizeof(float),   &thresh);
+		res = clSetKernelArg(cost_kernel, 7, sizeof(int),     &width);
+		res = clSetKernelArg(cost_kernel, 8, sizeof(cl_mem),  &lomem);
+		res = clSetKernelArg(cost_kernel, 9, sizeof(cl_mem),  &himem);
 		res = clSetKernelArg(cost_kernel, 10, sizeof(cl_mem), &amem);
 		res = clSetKernelArg(cost_kernel, 11, sizeof(cl_mem), &dmem);
-		res = clSetKernelArg(cost_kernel, 12, sizeof(int), &layers);
+		res = clSetKernelArg(cost_kernel, 12, sizeof(int),    &layers);
 
 		cl_event ev;
-		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
+		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); /// call cost_kernel #####
 	}
-	else
+	else // if the device buffers already exist ////
 	{
 		status = clEnqueueWriteBuffer(m_queue,
 			imgmem,
@@ -217,13 +220,14 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		// set kernelArg
 		res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem), &pbuf);
 		res = clSetKernelArg(cost_kernel, 2, sizeof(cl_mem), &imgmem);
-		res = clSetKernelArg(cost_kernel, 5, sizeof(int), &layerstep);
-		res = clSetKernelArg(cost_kernel, 6, sizeof(float), &thresh);
-		res = clSetKernelArg(cost_kernel, 7, sizeof(int), &width);
-		res = clSetKernelArg(cost_kernel, 12, sizeof(int), &layers);
+		res = clSetKernelArg(cost_kernel, 5, sizeof(int),    &layerstep);
+		res = clSetKernelArg(cost_kernel, 6, sizeof(float),  &thresh);
+		res = clSetKernelArg(cost_kernel, 7, sizeof(int),    &width);
+		res = clSetKernelArg(cost_kernel, 12, sizeof(int),   &layers);
 		cl_event ev;
-		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
+		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); /// call cost_kernel #####
 	}
+/*
 	// Enqueue read output buffer
 	//cl_event readEvt;
 	//status = clEnqueueReadBuffer(m_queue,
@@ -246,8 +250,9 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 	//							&readEvt);
 //	status = clFlush(m_queue);
 //	status = waitForEventAndRelease(&readEvt);
+*/
 }
-
+/*
 //void RunCL::minv(float *loInd, float *loVal, int layers)
 //{
 //	cl_int status;
@@ -344,21 +349,22 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 //
 //	res = clEnqueueNDRangeKernel(m_queue, optiA_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
 //}
+*/
 
 void RunCL::allocatemem(float *qx,float *qy, float* gx, float* gy)
 {
 	cl_int res;
-	qxmem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height  * sizeof(float), 0, &res);
-	qymem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height  * sizeof(float), 0, &res);
-	dmem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height  * sizeof(float), 0, &res);
-	amem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
-	gxmem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
-	gymem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	qxmem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	qymem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	dmem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	amem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	gxmem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	gymem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
 	gqxmem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
 	gqymem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
-	g1mem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
-	lomem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
-	himem = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	g1mem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	lomem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
+	himem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE | (1 << 6), width * height * sizeof(float), 0, &res);
 
 	
 	cl_int status;
@@ -368,27 +374,27 @@ void RunCL::allocatemem(float *qx,float *qy, float* gx, float* gy)
 		CL_FALSE,
 		0,
 		width * height,
-		qx,
+		qx,/////////////////
 		0,
 		NULL,
 		&writeEvt);
+    
 	status = clEnqueueWriteBuffer(m_queue,
 		qymem,
 		CL_FALSE,
 		0,
 		width * height,
-		qy,
+		qy,/////////////////
 		0,
 		NULL,
 		&writeEvt);
-	
 	
 	status = clEnqueueWriteBuffer(m_queue,
 		gxmem,
 		CL_FALSE,
 		0,
 		width * height * sizeof(float),
-		gx,
+		gx,/////////////////
 		0,
 		NULL,
 		&writeEvt);
@@ -398,7 +404,7 @@ void RunCL::allocatemem(float *qx,float *qy, float* gx, float* gy)
 		CL_FALSE,
 		0,
 		width * height * sizeof(float),
-		gy,
+		gy,/////////////////
 		0,
 		NULL,
 		&writeEvt);
@@ -407,14 +413,16 @@ void RunCL::allocatemem(float *qx,float *qy, float* gx, float* gy)
 	status = waitForEventAndRelease(&writeEvt);
 }
 
-RunCL::~RunCL()
+RunCL::~RunCL() // destructor
 {
 	cl_int status;
 	status = clReleaseKernel(cost_kernel);
+    /*
 	//status = clReleaseKernel(min_kernel);
 	//status = clReleaseKernel(optiQ_kernel);
 	//status = clReleaseKernel(optiD_kernel);
 	//status = clReleaseKernel(optiA_kernel);
+    */
 	status = clReleaseKernel(cache1_kernel);
 	status = clReleaseKernel(cache2_kernel);
 	status = clReleaseKernel(updateQ_kernel);
@@ -444,11 +452,14 @@ void RunCL::CleanUp()
 	status = clReleaseMemObject(amem);
 	status = clReleaseMemObject(lomem);
 	status = clReleaseMemObject(himem);
-	/*status = clReleaseMemObject(gdmem);
+	/*
+    status = clReleaseMemObject(gdmem);
 	status = clReleaseMemObject(gumem);
 	status = clReleaseMemObject(glmem);
-	status = clReleaseMemObject(grmem);*/
+	status = clReleaseMemObject(grmem);
+	*/
 }
+
 
 void RunCL::cacheGValue(cv::Mat &bgray)
 {
@@ -474,11 +485,12 @@ void RunCL::cacheGValue(cv::Mat &bgray)
 
 	res = clSetKernelArg(cache1_kernel, 0, sizeof(cl_mem), &basegraymem);
 	res = clSetKernelArg(cache1_kernel, 1, sizeof(cl_mem), &g1mem);
-	res = clSetKernelArg(cache1_kernel, 2, sizeof(int), &width);
-	res = clSetKernelArg(cache1_kernel, 3, sizeof(int), &height);
-	res = clEnqueueNDRangeKernel(m_queue, cache1_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
+	res = clSetKernelArg(cache1_kernel, 2, sizeof(int),    &width);
+	res = clSetKernelArg(cache1_kernel, 3, sizeof(int),    &height);
+	res = clEnqueueNDRangeKernel(m_queue, cache1_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run cache1_kernel  aka CacheG1(..)
 	
-	/*size_t st = width * height * sizeof(float);
+	/*
+    size_t st = width * height * sizeof(float);
 	float* g1 = (float*)malloc(st);
 	cl_event readEvt;
 	status = clEnqueueReadBuffer(m_queue,
@@ -496,15 +508,17 @@ void RunCL::cacheGValue(cv::Mat &bgray)
 	qx.create(height, width, CV_32FC1); qx.reshape(0, height);
 	memcpy(qx.data, g1, st);
 	double min = 0, max = 0;
-	cv::minMaxIdx(qx, &min, &max);*/
+	cv::minMaxIdx(qx, &min, &max);
+	*/
 
 	res = clSetKernelArg(cache2_kernel, 0, sizeof(cl_mem), &g1mem);
 	res = clSetKernelArg(cache2_kernel, 1, sizeof(cl_mem), &gxmem);
 	res = clSetKernelArg(cache2_kernel, 2, sizeof(cl_mem), &gymem);
-	res = clSetKernelArg(cache2_kernel, 3, sizeof(int), &width);
-	res = clSetKernelArg(cache2_kernel, 4, sizeof(int), &height);
-	res = clEnqueueNDRangeKernel(m_queue, cache2_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
+	res = clSetKernelArg(cache2_kernel, 3, sizeof(int),    &width);
+	res = clSetKernelArg(cache2_kernel, 4, sizeof(int),    &height);
+	res = clEnqueueNDRangeKernel(m_queue, cache2_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run cache2_kernel  aka CacheG2(..)
 }
+
 
 void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 {
@@ -517,17 +531,17 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 	res = clSetKernelArg(updateQ_kernel, 2, sizeof(cl_mem), &gqxmem);
 	res = clSetKernelArg(updateQ_kernel, 3, sizeof(cl_mem), &gqymem);
 	res = clSetKernelArg(updateQ_kernel, 4, sizeof(cl_mem), &dmem);
-	res = clSetKernelArg(updateQ_kernel, 5, sizeof(float), &epsilon);
-	res = clSetKernelArg(updateQ_kernel, 6, sizeof(float), &theta);
-	res = clSetKernelArg(updateQ_kernel, 7, sizeof(int), &width);
-	res = clSetKernelArg(updateQ_kernel, 8, sizeof(int), &height);
+	res = clSetKernelArg(updateQ_kernel, 5, sizeof(float),  &epsilon);
+	res = clSetKernelArg(updateQ_kernel, 6, sizeof(float),  &theta);
+	res = clSetKernelArg(updateQ_kernel, 7, sizeof(int),    &width);
+	res = clSetKernelArg(updateQ_kernel, 8, sizeof(int),    &height);
 	
-	res = clEnqueueNDRangeKernel(m_queue, updateQ_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
+	res = clEnqueueNDRangeKernel(m_queue, updateQ_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run updateQ_kernel  aka UpdateQ(..)
 	
 	size_t st = width * height * sizeof(float);
 	float* gqx = (float*)malloc(st);
 	cl_event readEvt;
-	status = clEnqueueReadBuffer(m_queue,
+	status = clEnqueueReadBuffer(m_queue,  // readBuffer  gqxmem
 		gqxmem,
 		CL_FALSE,
 		0,
@@ -548,11 +562,12 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 	res = clSetKernelArg(updateD_kernel, 1, sizeof(cl_mem), &gqymem);
 	res = clSetKernelArg(updateD_kernel, 2, sizeof(cl_mem), &dmem);
 	res = clSetKernelArg(updateD_kernel, 3, sizeof(cl_mem), &amem);
-	res = clSetKernelArg(updateD_kernel, 4, sizeof(float), &theta);
-	res = clSetKernelArg(updateD_kernel, 5, sizeof(float), &sigma_d);
-	res = clSetKernelArg(updateD_kernel, 6, sizeof(int), &width);
-	res = clEnqueueNDRangeKernel(m_queue, updateD_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
+	res = clSetKernelArg(updateD_kernel, 4, sizeof(float),  &theta);
+	res = clSetKernelArg(updateD_kernel, 5, sizeof(float),  &sigma_d);
+	res = clSetKernelArg(updateD_kernel, 6, sizeof(int),    &width);
+	res = clEnqueueNDRangeKernel(m_queue, updateD_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run updateD_kernel  aka UpdateD(..)
 }
+
 
 void RunCL::updateA(int layers, float lambda,float theta)
 {
@@ -563,11 +578,11 @@ void RunCL::updateA(int layers, float lambda,float theta)
 	res = clSetKernelArg(updateA_kernel, 0, sizeof(cl_mem), &cdatabuf);
 	res = clSetKernelArg(updateA_kernel, 1, sizeof(cl_mem), &amem);
 	res = clSetKernelArg(updateA_kernel, 2, sizeof(cl_mem), &dmem);
-	res = clSetKernelArg(updateA_kernel, 3, sizeof(int), &layers);
-	res = clSetKernelArg(updateA_kernel, 4, sizeof(int), &width);
-	res = clSetKernelArg(updateA_kernel, 5, sizeof(int), &height);
-	res = clSetKernelArg(updateA_kernel, 6, sizeof(float), &lambda);
-	res = clSetKernelArg(updateA_kernel, 7, sizeof(float), &theta);
+	res = clSetKernelArg(updateA_kernel, 3, sizeof(int),    &layers);
+	res = clSetKernelArg(updateA_kernel, 4, sizeof(int),    &width);
+	res = clSetKernelArg(updateA_kernel, 5, sizeof(int),    &height);
+	res = clSetKernelArg(updateA_kernel, 6, sizeof(float),  &lambda);
+	res = clSetKernelArg(updateA_kernel, 7, sizeof(float),  &theta);
 
-	res = clEnqueueNDRangeKernel(m_queue, updateA_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
+	res = clEnqueueNDRangeKernel(m_queue, updateA_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run updateA_kernel  aka UpdateA(..)
 }
