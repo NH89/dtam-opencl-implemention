@@ -1,6 +1,3 @@
-
-codes.zip
-codes/DtamRealizition/targetver.h
-.kdev4/
-dtam-opencl-implemention.kdev4
-
+codes/DtamRealizition/DtamRealizition.kdev4
+codes/DtamRealizition/.kdev4/*
+codes/DtamRealizition/build/*

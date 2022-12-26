@@ -1,4 +1,4 @@
-#include "stdafx.h"     // windows precompiled header file
+//#include "stdafx.h"     // windows precompiled header file
 #include "CostVol.h"
 //#include <opencv2/core/operations.hpp>
 #include <fstream>

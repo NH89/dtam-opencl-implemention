@@ -1,4 +1,4 @@
-#include "stdafx.h"  // windows precompiled header file
+// #include "stdafx.h"  // windows precompiled header file
 #include "RunCL.h"
 
 #define SDK_SUCCESS 0
@@ -25,6 +25,8 @@ RunCL::RunCL() // constructor
 		platform = platforms[1];
 		free(platforms);
 	}
+	
+	cout << "cl_platform_id platform = " << platform ; 
 
 	/*Step 2:Query the platform and choose the first GPU device if has one.Otherwise use the CPU as device.*/////////////
 	cl_uint				numDevices = 0;
@@ -43,6 +45,10 @@ RunCL::RunCL() // constructor
 		devices = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id));
 		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
 	}
+	
+	cout << "cl_device_id  devices = " << devices ;   // pointer to array of unkown length...
+	
+	cout << "cl_int	status = " << status ;
 
 
 	/*Step 3: Create context.*///////////////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +74,7 @@ RunCL::RunCL() // constructor
 													&status);
 
 	/*Step 5: Create program object *////////////////////////////////////////////////////////////////////////////////////
-	const char *filename = "DTAM_kernels2.cl";
+	const char *filename = "/home/hockingsn/Programming/OpenCV/otherDTAMs/dtam-opencl-implemention/codes/DtamRealizition/DTAM_kernels2.cl"; //"DTAM_kernels2.cl";
 	string sourceStr;
 	status = convertToString(filename, sourceStr);
 	const char *source = sourceStr.c_str();

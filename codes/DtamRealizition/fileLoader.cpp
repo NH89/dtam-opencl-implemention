@@ -1,9 +1,12 @@
 // loads all files of a given name and extension
-#include "stdafx.h"     // windows precompiled header file
+//#include "stdafx.h"     // windows precompiled header file
+#include <iostream>
+#include <set>
+#include <string>
 #include "fileLoader.hpp"
 #include <boost/filesystem.hpp>
 #include <fstream>
-#include <comdef.h>	    // part of MS Platform SDK
+//#include <comdef.h>	    // part of MS Platform SDK
 
     using namespace cv;
     using namespace std;
@@ -39,14 +42,18 @@ void loadAhanda(const char * rootpath,
     if(root!=string(rootpath)){
 
         root=string(rootpath);
-        get_all(root, ".txt", txt);
+        get_all(root, ".txt", txt);                            // gathers all filepaths with each suffix, into c++ vectors.
         get_all(root, ".png", png);
         get_all(root, ".depth", depth);
                 cout<<"Loading......"<<endl;
     }
-	const wchar_t* w = txt[imageNumber].c_str();
-	_bstr_t b(w);
-	const char* ch = b;
+    std::string str = txt[imageNumber].c_str();
+    char * ch = new char [str.length()+1];
+    std::strcpy (ch, str.c_str());
+    
+	//const wchar_t* w = txt[imageNumber].c_str();
+	//_bstr_t b(w);                                              // a MS comdef.h class. Basic string or binary string
+	//const char* ch = b;
     convertAhandaPovRayToStandard(ch,R,T);
     //cout<<"Reading: "<<png[imageNumber].filename().string()<<endl;
     image = imread(png[imageNumber].string());
@@ -89,39 +96,6 @@ Mat loadDepthAhanda(string filename, int r,int c,Mat cameraMatrix){
     
     return out;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -2,7 +2,7 @@
 // into the standard [R|T] world -> camera format used by OpenCV
 // It is based on a file they provided there, but makes the world coordinate system right handed, with z up,
 // x right, and y forward.
-#include "stdafx.h"     // windows precompiled header file
+//#include "stdafx.h"     // windows precompiled header file
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <fstream>

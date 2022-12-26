@@ -1,0 +1,93 @@
+# cribbed from 
+# https://github.com/NH89/Morphognesis
+# https://github.com/KhronosGroup/OpenCL-Guide/blob/main/chapters/getting_started_linux.md
+# NB OpenCV-4 uses C++11 by default. 
+
+cmake_minimum_required(VERSION 3.16   FATAL_ERROR) # 3.1 << C_STANDARD 11
+
+cmake_policy(SET CMP0054 NEW)
+
+project(DTAM-OpenCL LANGUAGES C CXX)
+
+
+set(CMAKE_C_STANDARD 11)
+#set(CMAKE_CPP_STANDARD 11) # set(CMAKE_CPP_STANDARD 17)  NB need (<=11 for VTP)  &&  (>+11 for C++ threads)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+      "Choose the type of build, options are: Debug Release
+RelWithDebInfo MinSizeRel."
+      FORCE)
+endif(NOT CMAKE_BUILD_TYPE)
+
+set(Boost_USE_STATIC_LIBS OFF)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
+
+find_package(Boost  REQUIRED COMPONENTS filesystem) # see https://cliutils.gitlab.io/modern-cmake/chapters/packages/Boost.html
+message(STATUS "Boost version: ${Boost_VERSION}")
+
+# This is needed if your Boost version is newer than your CMake version
+# or if you have an old version of CMake (<3.5)
+if(NOT TARGET Boost::filesystem)
+    add_library(Boost::filesystem IMPORTED INTERFACE)
+    set_property(TARGET Boost::filesystem PROPERTY
+        INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
+    set_property(TARGET Boost::filesystem PROPERTY
+        INTERFACE_LINK_LIBRARIES ${Boost_LIBRARIES})
+endif()
+
+find_package(OpenCL REQUIRED)
+find_package(OpenCV REQUIRED)
+
+if( OpenCV_FOUND )
+  # Additional Include Directories
+  include_directories( ${OpenCV_INCLUDE_DIRS} )
+
+  # Additional Library Directories
+  link_directories( ${OpenCV_LIB_DIR} )
+
+  # Additional Dependencies
+  
+endif()
+
+#### from https://docs.opencv.org/4.x/db/df5/tutorial_linux_gcc_cmake.html
+
+#cmake_minimum_required(VERSION 2.8)
+#project( DisplayImage )
+#find_package( OpenCV REQUIRED )
+#include_directories( ${OpenCV_INCLUDE_DIRS} )
+#add_executable( DisplayImage DisplayImage.cpp )
+#target_link_libraries( DisplayImage ${OpenCV_LIBS} )
+
+####
+
+
+add_executable(DTAM-OpenCL
+        DtamRealizition.cpp                     # contains: int main()
+        convertAhandaPovRayToStandard.cpp
+        convertAhandaPovRayToStandard.h
+        CostVol.cpp
+        CostVol.h
+        fileLoader.cpp
+        fileLoader.hpp
+        LoadFiles.cpp
+        RunCL.cpp
+        RunCL.h
+        utils.hpp
+        DTAM_kernels2.cl                        # OpenCL device code
+        )
+
+target_link_libraries(${PROJECT_NAME} PRIVATE 
+        OpenCL::OpenCL  
+        ${OpenCV_LIBS} 
+        Boost::filesystem
+        )
+
+set_target_properties(${PROJECT_NAME} PROPERTIES C_STANDARD 11
+                                                 C_STANDARD_REQUIRED ON
+                                                 C_EXTENSIONS OFF)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE CL_TARGET_OPENCL_VERSION=120) # i.e. OpenCL 1.2

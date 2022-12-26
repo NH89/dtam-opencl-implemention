@@ -1,6 +1,6 @@
 // DtamRealizition.cpp : 定义控制台应用程序的入口点。
 //
-#include "stdafx.h"   // windows precompiled header file
+//#include "stdafx.h"   // windows precompiled header file
 #include <boost/filesystem.hpp>
 #include "CostVol.h"
 
@@ -20,7 +20,7 @@ int main()
 	//initialize opencl
 	int numImg = 50;
 	char filename[500];
-	std::string pathDepthDir = "D:\\projects\\";
+	//std::string pathDepthDir = "D:\\projects\\";
 	Mat image, R, T;
 	Mat cameraMatrix = (Mat_<double>(3, 3) << 481.20, 0.0, 319.5,
 		0.0, 480.0, 239.5,
@@ -32,7 +32,8 @@ int main()
 	for (int i =0; i < 11; i += inc) {                                             // Load images & data from file into c++ vectors
 		Mat tmp, d, image;
 		int offset = 0;
-		loadAhanda("D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
+		loadAhanda("/home/hockingsn/Programming/computer_vision_data/ahanda-icl/Office_Room_of_kt0/office_room_traj0_loop",
+                   //"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
 			65535,
 			i + offset,
 			image,

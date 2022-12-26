@@ -1,5 +1,9 @@
 #pragma once
-#include <CL\cl.h>
+#define CL_VERSION_1_1
+#define CL_VERSION_1_2
+#define CL_VERSION_2_0  // required to include some definitions in CL/cl.h
+
+#include "/usr/include/CL/cl.h"//<CL\cl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -7,9 +11,9 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#include <opencv2\highgui.hpp>
-#include "opencv2\core\core.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
+#include "/usr/local/include/opencv4/opencv2/highgui.hpp"//<opencv2\highgui.hpp>
+#include "/usr/local/include/opencv4/opencv2/core/core.hpp"//"opencv2\core\core.hpp"
+#include "/usr/local/include/opencv4/opencv2/imgproc/imgproc.hpp"//"opencv2/imgproc/imgproc.hpp"
 
 using namespace std;
 class RunCL
