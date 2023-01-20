@@ -24,7 +24,7 @@ RunCL::RunCL() // constructor
 	{
 		cl_platform_id* platforms = (cl_platform_id*)malloc(numPlatforms * sizeof(cl_platform_id));
 		status = clGetPlatformIDs(numPlatforms, platforms, NULL);
-		platform = platforms[1]; //0 or 1 , Need to choose platform and GPU
+		platform = platforms[0]; //0 or 1 , Need to choose platform and GPU ##################################### Choose platform ##############
 		cout << "platforms[0] = " << platforms[0] << ", \nplatforms[1] = " << platforms[1] << "\n" << flush;
 		free(platforms);
 	}
@@ -137,6 +137,8 @@ RunCL::RunCL() // constructor
 	basegraymem=gxmem=gymem=g1mem=gqxmem=gqymem=lomem=himem=0;
 
 	cout << "RunCL_chk 9\n" << flush;
+
+
 }
 
 
@@ -264,8 +266,20 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 
 		cout << "\ncalcCostVol chk6," << flush;
 		int layerstep = width * height;
-		global_work_size = layerstep;
-		cout<<"\nglobal_work_size=layerstep=width*height="<<width<<"*"<<height<<"="<<layerstep<<flush;
+
+		// Get the maximum work group size for executing the kernel on the device
+		// From https://github.com/rsnemmen/OpenCL-examples/blob/e2c34f1dfefbd265cfb607c2dd6c82c799eb322a/square_array/square.c
+		status = clGetKernelWorkGroupInfo(cost_kernel, deviceId, CL_KERNEL_WORK_GROUP_SIZE, sizeof(local_work_size), &local_work_size, NULL);
+		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+
+		// Number of total work items, calculated here after 1st image is loaded &=> know the size.
+		// NB localSize must be devisor
+		// NB global_work_size must be a whole number of "Preferred work group size multiple" for Nvidia.
+		global_work_size = ceil((float)layerstep/(float)local_work_size);
+		global_work_size = ceil((float)global_work_size/(float)local_work_size) * local_work_size;
+		cout<<"\nglobal_work_size="<<global_work_size<<", local_work_size="<<local_work_size<<", deviceId="<<deviceId<<"\n"<<flush;
+		cout<<"\nlayerstep=width*height="<<width<<"*"<<height<<"="<<layerstep<<flush;
+
 		// set kernelArg
 		res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem),  &pbuf);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 		res = clSetKernelArg(cost_kernel, 1, sizeof(cl_mem),  &basemem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
@@ -300,22 +314,21 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		cout<<"\nlayers="<<layers ;			//12 layers = 32
 		cout<<"\n"<<flush;
 
-
 		cout << "\n\ncalcCostVol chk7," << flush;
 		cl_event ev;
 		cout<<"\n\nclEnqueueNDRangeKernel(";
 		cout<<"\ncommand_queue="<<m_queue;
 		cout<<"\nkernel=cost_kernel="<<cost_kernel;
 		cout<<"\nwork_dim="<<1;
-		cout<<"\nglobal_work_offset="<<0;
+		cout<<"\nglobal_work_offset="<<"NULL"/*0*/;
 		cout<<"\nglobal_work_size="<<global_work_size;
-		cout<<"\nlocal_work_size="<<0;
+		cout<<"\nlocal_work_size="<<local_work_size/*"NULL"*//*0*/;
 		cout<<"\nnum_events_in_wait_list"<<0;
 		cout<<"\nevent_wait_list=NULL";
 		cout<<"\nevent="<<ev;
 		cout<<"\n)"<<flush;
 
-		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); /// call cost_kernel #####
+		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size /*NULL*//*0*/, 0, NULL, &ev); /// call cost_kernel #####
 		if (res != CL_SUCCESS)	{ cout << "\nclEnqueueNDRangeKernel res = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 
 		status = clFinish(m_queue);			// clFinish needs command_queue, not event list.
@@ -326,7 +339,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		//status = waitForEventAndRelease(&ev);  //  is this right ? should we clReleaseEvent ?
 		//if (status != CL_SUCCESS)	{ cout << "\nwaitForEventAndRelease(&ev);  status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 		*/
-
+		cout << "\n\ncalcCostVol chk7.5" << flush;
 	}
 	else // if the device buffers already exist ////
 	{
@@ -399,10 +412,9 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		//status = waitForEventAndRelease(&writeEvt);
 		//if (status != CL_SUCCESS)	{ cout << "\nwaitForEventAndRelease status="<<status<<" "<<checkerror(status)<<"\n"<<flush; exit_(status);}
 
-
 		cout << "\ncalcCostVol chk9.2," << flush;
 		int layerstep = width * height;
-		global_work_size = layerstep;
+
 		cout << "\ncalcCostVol chk10," << flush;
 		// set kernelArg
 		res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem), &pbuf);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
@@ -412,8 +424,22 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		res = clSetKernelArg(cost_kernel, 7, sizeof(int),    &width);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 		res = clSetKernelArg(cost_kernel, 12, sizeof(int),   &layers);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 		cout << "\ncalcCostVol chk11," << flush;
+
 		cl_event ev;
-		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); /// call cost_kernel #####
+		cout<<"\n\nclEnqueueNDRangeKernel(";
+		cout<<"\ncommand_queue="<<m_queue;
+		cout<<"\nkernel=cost_kernel="<<cost_kernel;
+		cout<<"\nwork_dim="<<1;
+		cout<<"\nglobal_work_offset="<<"NULL"/*0*/;
+		cout<<"\nglobal_work_size="<<global_work_size;
+		cout<<"\nlocal_work_size="<<local_work_size/*"NULL"*//*0*/;
+		cout<<"\nnum_events_in_wait_list"<<0;
+		cout<<"\nevent_wait_list=NULL";
+		cout<<"\nevent="<<ev;
+		cout<<"\n)"<<flush;
+
+		res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size /*NULL*//*0*/, 0, NULL, &ev);
+		//res = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, NULL, 0, NULL, &ev); /// call cost_kernel #####
 		if (res != CL_SUCCESS)	{ cout << "\nclEnqueueNDRangeKernel res = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 	}
 
@@ -757,7 +783,8 @@ void RunCL::cacheGValue(cv::Mat &bgray)
 	res = clSetKernelArg(cache1_kernel, 3, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	cout<<"\ncacheGValue_chk4"<<flush;
 
-	res = clEnqueueNDRangeKernel(m_queue, cache1_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run cache1_kernel  aka CacheG1(..)
+	//clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size /*NULL*//*0*/, 0, NULL, &ev)
+	res = clEnqueueNDRangeKernel(m_queue, cache1_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size, 0, NULL, &ev); // run cache1_kernel  aka CacheG1(..)
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 	cout<<"\ncacheGValue_chk5"<<flush;
 	
@@ -790,7 +817,8 @@ void RunCL::cacheGValue(cv::Mat &bgray)
 	res = clSetKernelArg(cache2_kernel, 4, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	cout<<"\ncacheGValue_chk6"<<flush;
 
-	res = clEnqueueNDRangeKernel(m_queue, cache2_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run cache2_kernel  aka CacheG2(..)
+	//clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size /*NULL*//*0*/, 0, NULL, &ev)
+	res = clEnqueueNDRangeKernel(m_queue, cache2_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run cache2_kernel  aka CacheG2(..)
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 	cout<<"\ncacheGValue_chk_7_finished"<<flush;
 }
@@ -814,7 +842,8 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 	res = clSetKernelArg(updateQ_kernel, 8, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	
 	cout<<"\nupdateQD_chk1"<<flush;
-	res = clEnqueueNDRangeKernel(m_queue, updateQ_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run updateQ_kernel  aka UpdateQ(..)
+	//clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size /*NULL*//*0*/, 0, NULL, &ev)
+	res = clEnqueueNDRangeKernel(m_queue, updateQ_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run updateQ_kernel  aka UpdateQ(..)
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 
 	cout<<"\nupdateQD_chk2"<<flush;
@@ -856,7 +885,8 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 	res = clSetKernelArg(updateD_kernel, 6, sizeof(int),    &width);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 
 	cout<<"\nupdateQD_chk7"<<flush;
-	res = clEnqueueNDRangeKernel(m_queue, updateD_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run updateD_kernel  aka UpdateD(..)
+	//clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size /*NULL*//*0*/, 0, NULL, &ev)
+	res = clEnqueueNDRangeKernel(m_queue, updateD_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run updateD_kernel  aka UpdateD(..)
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 
 	cout<<"\nupdateQD_chk8_finished\n"<<flush;
@@ -878,6 +908,7 @@ void RunCL::updateA(int layers, float lambda,float theta)
 	res = clSetKernelArg(updateA_kernel, 6, sizeof(float),  &lambda);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateA_kernel, 7, sizeof(float),  &theta);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 
-	res = clEnqueueNDRangeKernel(m_queue, updateA_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); // run updateA_kernel  aka UpdateA(..)
+	//clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, NULL/*0*/, &global_work_size, &local_work_size /*NULL*//*0*/, 0, NULL, &ev)
+	res = clEnqueueNDRangeKernel(m_queue, updateA_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run updateA_kernel  aka UpdateA(..)
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 }

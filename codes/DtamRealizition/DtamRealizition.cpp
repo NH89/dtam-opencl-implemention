@@ -52,7 +52,7 @@ int main()
 
 	cout << "\n main_chk 1.2\n" << flush;
 	///////
-	return 0;
+	//return 0;
 
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;
 	double reconstructionScale = 1;
