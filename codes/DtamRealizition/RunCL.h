@@ -1,19 +1,20 @@
 #pragma once
-#define CL_VERSION_1_1
-#define CL_VERSION_1_2
-#define CL_VERSION_2_0  // required to include some definitions in CL/cl.h
+//#define CL_VERSION_1_1
+//#define CL_VERSION_1_2
+//#define CL_VERSION_2_0  // required to include some definitions in CL/cl.h
 
-#include "/usr/include/CL/cl.h"//<CL\cl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
+#include <CL/cl.h> //"/usr/local/cuda/include/CL/cl.h"// "/usr/include/CL/cl.h"//<CL\cl.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <fstream>
-#include "/usr/local/include/opencv4/opencv2/highgui.hpp"//<opencv2\highgui.hpp>
-#include "/usr/local/include/opencv4/opencv2/core/core.hpp"//"opencv2\core\core.hpp"
-#include "/usr/local/include/opencv4/opencv2/imgproc/imgproc.hpp"//"opencv2/imgproc/imgproc.hpp"
+
+#include <opencv2/core.hpp>// "/usr/local/include/opencv4/opencv2/core/core.hpp"  //"opencv2\core\core.hpp"
+#include <opencv2/imgproc.hpp>// "/usr/local/include/opencv4/opencv2/imgproc/imgproc.hpp"  //"opencv2/imgproc/imgproc.hpp"
+#include <opencv2/highgui.hpp>// "/usr/local/include/opencv4/opencv2/highgui.hpp"  //<opencv2\highgui.hpp>
 
 using namespace std;
 class RunCL
@@ -87,17 +88,25 @@ public:
 
 	int waitForEventAndRelease(cl_event *event)
 	{
+		cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
 		cl_int status = CL_SUCCESS;
 		status = clWaitForEvents(1, event);
-		if (status != CL_SUCCESS)
-			return 0;
-		else
-			return 1;
+
+		if (status != CL_SUCCESS){
+			cout << "\nclWaitForEvents status=" << status << ", " <<  checkerror(status) <<"\n" << flush;
+			exit_(status);
+			//return status;
+		}
+		cout << "\nclWaitForEvents_chk1" << flush;
+
 		status = clReleaseEvent(*event);
-		if (status != CL_SUCCESS)
-			return 0;
-		else
-			return 1;
+		if (status != CL_SUCCESS){
+			cout << "\nclReleaseEvent status=" << status << ", " <<  checkerror(status) << "\n" << flush;
+			exit_(status);
+			//return status;
+		}
+		cout << "\nclWaitForEvents_chk2_finished\n" << flush;
+		return status;
 	}
 
 	string checkerror(int input)
@@ -105,6 +114,8 @@ public:
 		int errorCode = input;
 		switch (errorCode)
 		{
+		case -9999:
+			return "Illegal read or write to a buffer";		// NVidia error code
 		case CL_DEVICE_NOT_FOUND:
 			return "CL_DEVICE_NOT_FOUND";
 		case CL_DEVICE_NOT_AVAILABLE:
@@ -214,7 +225,10 @@ public:
 
 	void ReadOutput(float* outmat)
 	{
+		cout<<"\nReadOutput_chk0"<<flush;
 		cl_event readEvt;
+
+		cout<<"\nReadOutput_chk1"<<flush;
 		cl_int status = clEnqueueReadBuffer(m_queue,
 											dmem,
 											CL_FALSE,
@@ -224,9 +238,33 @@ public:
 											0,
 											NULL,
 											&readEvt);
+		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+		cout<<"\nReadOutput_chk2_finished"<<flush;
+	}
+
+///home/nick/programming/ComputerVision/DTAM/dtam-opencl-implemention/codes/DtamRealizition/RunCL.cpp:191:27: error: no matching function for call to ‘RunCL::ReadOutput(uchar*&, _cl_mem*&, size_t&)’
+	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size)
+	{
+		cout<<"\nReadOutput_chk0"<<flush;
+		cl_event readEvt;
+
+		cout<<"\nReadOutput_chk1"<<flush;
+		cl_int status = clEnqueueReadBuffer(m_queue,
+											buf_mem,
+											CL_FALSE,
+											0,
+											data_size,
+											outmat,
+											0,
+											NULL,
+											&readEvt);
+		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+		cout<<"\nReadOutput_chk2_finished"<<flush;
 	}
 
 	void CleanUp();
+
+	void exit_(cl_int res);
 
 	~RunCL();
 };

@@ -1,3 +1,8 @@
 codes/DtamRealizition/DtamRealizition.kdev4
 codes/DtamRealizition/.kdev4/*
 codes/DtamRealizition/build/*
+.kdev4/*
+codes/build/*
+codes/build_AMD/*
+dtam-opencl-implemention.kdev4
+

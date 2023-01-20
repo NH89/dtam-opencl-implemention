@@ -3,8 +3,9 @@
 //#include <opencv2/core/operations.hpp>
 #include <fstream>
 
-using namespace std;
+
 using namespace cv;
+using namespace std;
 
 #define FLATALLOC(n) n.create(rows, cols, CV_32FC1); n.reshape(0, rows);
 
@@ -69,15 +70,16 @@ void CostVol::checkInputs(
 
 CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	float _far, cv::Mat R, cv::Mat T, cv::Mat _cameraMatrix, float occlusionThreshold,
-	float initialCost, float initialWeight)
+	float initialCost, float initialWeight) // NB defaults: float initialCost = 3.0, float initialWeight = .001
 	:
 	R(R), T(T), occlusionThreshold(occlusionThreshold), initialWeight(initialWeight)
 {
-
+	std::cout << "CostVol_chk 0\n" << std::flush;
 	//For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
 	CV_Assert(image.rows % 32 == 0 && image.cols % 32 == 0 && image.cols >= 64);
 	//     CV_Assert(_layers>=8);
 
+	cout << "CostVol_chk 1\n" << flush;
 	checkInputs(R, T, _cameraMatrix);
 	fid    = _fid;
 	rows   = image.rows;
@@ -111,15 +113,19 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	_gx = _gy   = 1;
 	cvrc.width  = cols;
 	cvrc.height = rows;
-    
+
+	cout << "CostVol_chk 2\n" <<flush;
 	cvrc.allocatemem( (float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data );
 
+	cout << "CostVol_chk 3\n" << flush;
 	image.copyTo(baseImage);
-	baseImage = baseImage.reshape(0, rows);
+	baseImage = baseImage.reshape(0, rows); 				// redundant, given that rows = baseImage.rows
     
+	cout << "CostVol_chk 4\n" << flush;
 	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
-	baseImageGray = baseImageGray.reshape(0, rows);
+	baseImageGray = baseImageGray.reshape(0, rows);			// TODO NB baseImageGray currently unused.
 	
+	cout << "CostVol_chk 5\n" << flush;
     count      = 0;
 	float off  = layers / 32;
 	thetaStart = 200.0*off;
@@ -135,42 +141,54 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	alloced = 0;
 	cachedG = 0;
 	dInited = 0;
+	cout << "CostVol_chk 6\n" << flush;
 }
 
 
 void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T) 
 {
+	cout << "\nupdateCost chk0," << flush;
 	Mat image;
 	_image.copyTo(image);
                                                                         //find projection matrix from cost volume to image (3x4)
+	cout << "\nupdateCost chk1," << flush;
 	Mat viewMatrixImage;
 	RTToP(R, T, viewMatrixImage);
 	Mat cameraMatrixTex(3, 4, CV_64FC1);
     
+	cout << "\nupdateCost chk2," << flush;
 	cameraMatrixTex = 0.0;
 	cameraMatrix.copyTo(cameraMatrixTex(Range(0, 3), Range(0, 3)));
 	cameraMatrixTex(Range(0, 2), Range(2, 3)) += 0.5;                   //add 0.5 to x,y out //removing causes crash
 	
+	cout << "\nupdateCost chk3," << flush;
 	Mat imFromWorld = cameraMatrixTex * viewMatrixImage;                //3x4  matrix
 	Mat imFromCV    = imFromWorld * projection.inv();
     
+	cout << "\nupdateCost chk4," << flush;
 	assert(baseImage.isContinuous() );
 	assert(lo.isContinuous() );
 	assert(hi.isContinuous() );
     
+	cout << "\nupdateCost chk5," << flush;
 	double *p = (double*)imFromCV.data;
 	float persp[12];
-	for (int i = 0; i<12; i++) {
-        persp[i] = p[i]; 
+	cout<<"\n\nprojection matrix, as doubles:\n";
+	for (int i = 0; i<12; i++) {	// Load the projection matrix as ana array of 12 doubles.
+        persp[i] = p[i]; 			// Implicit conversion double->float.
     }
-	image = image.reshape(0, rows);
+    for(int p_iter=0;p_iter<12;p_iter++){cout<<"p["<<p_iter<<"]="<<p[p_iter]<<"\t\t"; if((p_iter+1)%4==0){cout<<"\n";};}
+    cout<<"\n";
+	image = image.reshape(0, rows); // line 85: rows = image.rows, i.e. num rows in the base image. If the parameter is 0, the number of channels remains the same
 	/*
 	//memcpy(costd, (float*)costdata.data, st);
 	//float* hitd = (float*)malloc(st);
 	//memcpy(hitd, (float*)hit.data, st);
 	*/
+	cout << "\nupdateCost chk6," << flush;
                                                                         // calls calcCostVol(..) ###############################
 	cvrc.calcCostVol(persp, baseImage, image, (float*)costdata.data, (float*)hit.data, occlusionThreshold, layers);
+	cout << "\nupdateCost chk7_finished\n" << flush;
 	/*
     //memcpy(hit.data, hitd, st);
 	
@@ -186,24 +204,35 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 
 void CostVol::cacheGValues()
 {
+	cout<<"\nCostVol::cacheGValues()"<<flush;
+	cout<<"\nbaseImageGray.empty()="<<baseImageGray.empty()<<flush;
+	cout<<"\nbaseImageGray.size="<<baseImageGray.size<<flush;
+
 	cvrc.cacheGValue(baseImageGray);
 }
 
 
 void CostVol::updateQD()
 {
+	cout<<"\nupdateQD_chk0, epsilon="<<epsilon<<" theta="<<theta<<flush;
 	computeSigmas(epsilon, theta);
 
+	cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<flush;
 	cvrc.updateQD(epsilon, theta, sigma_q, sigma_d);
+
+	cout<<"\nupdateQD_chk3, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
 }
 
 
 bool CostVol::updateA()
 {
+	cout<<"\nupdateA_chk0, "<<flush;
 	bool doneOptimizing = theta <= thetaMin;
 
+	cout<<"\nupdateA_chk1, "<<flush;
 	cvrc.updateA(layers,lambda,theta);
 	
+	cout<<"\nupdateA_chk2, "<<flush;
 	theta *= thetaStep;
 
 	return doneOptimizing;
@@ -212,7 +241,12 @@ bool CostVol::updateA()
 
 void CostVol::GetResult()
 {
+	cout<<"\nCostVol::GetResult_chk0"<<flush;
 	cvrc.ReadOutput((float*)_a.data);
+
+	cout<<"\nCostVol::GetResult_chk1"<<flush;
 	cvrc.CleanUp();
+
+	cout<<"\nCostVol::GetResult_chk2_finished"<<flush;
 }
 

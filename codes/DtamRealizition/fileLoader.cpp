@@ -36,6 +36,7 @@ void loadAhanda(const char * rootpath,
                 int imageNumber,
                 Mat& image,
                 Mat& d,
+
                 Mat& cameraMatrix,
                 Mat& R,
                 Mat& T){
@@ -47,24 +48,36 @@ void loadAhanda(const char * rootpath,
         get_all(root, ".depth", depth);
                 cout<<"Loading......"<<endl;
     }
+    //cout << "chk loadAhanda_1\n" << flush;
+    //cout << "imageNumber = " << imageNumber << "\n" << flush;
+
     std::string str = txt[imageNumber].c_str();
+    //cout << "chk loadAhanda_1.1\n" << flush;
+
     char * ch = new char [str.length()+1];
+    //cout << "chk loadAhanda_1.2\n" << flush;
+
     std::strcpy (ch, str.c_str());
-    
+    //cout << "chk loadAhanda_2\n" << flush;
+
 	//const wchar_t* w = txt[imageNumber].c_str();
 	//_bstr_t b(w);                                              // a MS comdef.h class. Basic string or binary string
 	//const char* ch = b;
     convertAhandaPovRayToStandard(ch,R,T);
+    //cout << "chk loadAhanda_3\n" << flush;
+
     //cout<<"Reading: "<<png[imageNumber].filename().string()<<endl;
     image = imread(png[imageNumber].string());
+    //cout << "chk loadAhanda_4\n" << flush;
+
     int r=image.rows;
     int c=image.cols;
     if(depth.size()>0){
         cout<<"Depth: "<<depth[imageNumber].filename().string()<<endl;
         d=loadDepthAhanda(depth[imageNumber].string(), r,c,cameraMatrix);
     }
-    
-   
+    //cout << "chk loadAhanda_5\n" << flush;
+
 }
 
 
