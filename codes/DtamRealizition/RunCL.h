@@ -1,9 +1,6 @@
 #pragma once
-//#define CL_VERSION_1_1
-//#define CL_VERSION_1_2
-//#define CL_VERSION_2_0  // required to include some definitions in CL/cl.h
 
-#include <CL/cl.h> //"/usr/local/cuda/include/CL/cl.h"// "/usr/include/CL/cl.h"//<CL\cl.h>
+#include <CL/cl.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
@@ -12,9 +9,9 @@
 #include <string>
 #include <fstream>
 
-#include <opencv2/core.hpp>// "/usr/local/include/opencv4/opencv2/core/core.hpp"  //"opencv2\core\core.hpp"
-#include <opencv2/imgproc.hpp>// "/usr/local/include/opencv4/opencv2/imgproc/imgproc.hpp"  //"opencv2/imgproc/imgproc.hpp"
-#include <opencv2/highgui.hpp>// "/usr/local/include/opencv4/opencv2/highgui.hpp"  //<opencv2\highgui.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 
 using namespace std;
 class RunCL
@@ -86,149 +83,76 @@ public:
 
 	void cacheGValue(cv::Mat &bgray);
 
-	int waitForEventAndRelease(cl_event *event)
-	{
+	int waitForEventAndRelease(cl_event *event){
 		cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
 		cl_int status = CL_SUCCESS;
-		status = clWaitForEvents(1, event);
-
-		if (status != CL_SUCCESS){
-			cout << "\nclWaitForEvents status=" << status << ", " <<  checkerror(status) <<"\n" << flush;
-			exit_(status);
-			//return status;
-		}
-		cout << "\nclWaitForEvents_chk1" << flush;
-
-		status = clReleaseEvent(*event);
-		if (status != CL_SUCCESS){
-			cout << "\nclReleaseEvent status=" << status << ", " <<  checkerror(status) << "\n" << flush;
-			exit_(status);
-			//return status;
-		}
-		cout << "\nclWaitForEvents_chk2_finished\n" << flush;
+		status = clWaitForEvents(1, event); if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status=" << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
+		status = clReleaseEvent(*event); 	if (status != CL_SUCCESS) { cout << "\nclReleaseEvent status="  << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
 		return status;
 	}
 
-	string checkerror(int input)
-	{
+	string checkerror(int input) {
 		int errorCode = input;
-		switch (errorCode)
-		{
-		case -9999:
-			return "Illegal read or write to a buffer";		// NVidia error code
-		case CL_DEVICE_NOT_FOUND:
-			return "CL_DEVICE_NOT_FOUND";
-		case CL_DEVICE_NOT_AVAILABLE:
-			return "CL_DEVICE_NOT_AVAILABLE";
-		case CL_COMPILER_NOT_AVAILABLE:
-			return "CL_COMPILER_NOT_AVAILABLE";
-		case CL_MEM_OBJECT_ALLOCATION_FAILURE:
-			return "CL_MEM_OBJECT_ALLOCATION_FAILURE";
-		case CL_OUT_OF_RESOURCES:
-			return "CL_OUT_OF_RESOURCES";
-		case CL_OUT_OF_HOST_MEMORY:
-			return "CL_OUT_OF_HOST_MEMORY";
-		case CL_PROFILING_INFO_NOT_AVAILABLE:
-			return "CL_PROFILING_INFO_NOT_AVAILABLE";
-		case CL_MEM_COPY_OVERLAP:
-			return "CL_MEM_COPY_OVERLAP";
-		case CL_IMAGE_FORMAT_MISMATCH:
-			return "CL_IMAGE_FORMAT_MISMATCH";
-		case CL_IMAGE_FORMAT_NOT_SUPPORTED:
-			return "CL_IMAGE_FORMAT_NOT_SUPPORTED";
-		case CL_BUILD_PROGRAM_FAILURE:
-			return "CL_BUILD_PROGRAM_FAILURE";
-		case CL_MAP_FAILURE:
-			return "CL_MAP_FAILURE";
-		case CL_MISALIGNED_SUB_BUFFER_OFFSET:
-			return "CL_MISALIGNED_SUB_BUFFER_OFFSET";
-		case CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST:
-			return "CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST";
-		case CL_INVALID_VALUE:
-			return "CL_INVALID_VALUE";
-		case CL_INVALID_DEVICE_TYPE:
-			return "CL_INVALID_DEVICE_TYPE";
-		case CL_INVALID_PLATFORM:
-			return "CL_INVALID_PLATFORM";
-		case CL_INVALID_DEVICE:
-			return "CL_INVALID_DEVICE";
-		case CL_INVALID_CONTEXT:
-			return "CL_INVALID_CONTEXT";
-		case CL_INVALID_QUEUE_PROPERTIES:
-			return "CL_INVALID_QUEUE_PROPERTIES";
-		case CL_INVALID_COMMAND_QUEUE:
-			return "CL_INVALID_COMMAND_QUEUE";
-		case CL_INVALID_HOST_PTR:
-			return "CL_INVALID_HOST_PTR";
-		case CL_INVALID_MEM_OBJECT:
-			return "CL_INVALID_MEM_OBJECT";
-		case CL_INVALID_IMAGE_FORMAT_DESCRIPTOR:
-			return "CL_INVALID_IMAGE_FORMAT_DESCRIPTOR";
-		case CL_INVALID_IMAGE_SIZE:
-			return "CL_INVALID_IMAGE_SIZE";
-		case CL_INVALID_SAMPLER:
-			return "CL_INVALID_SAMPLER";
-		case CL_INVALID_BINARY:
-			return "CL_INVALID_BINARY";
-		case CL_INVALID_BUILD_OPTIONS:
-			return "CL_INVALID_BUILD_OPTIONS";
-		case CL_INVALID_PROGRAM:
-			return "CL_INVALID_PROGRAM";
-		case CL_INVALID_PROGRAM_EXECUTABLE:
-			return "CL_INVALID_PROGRAM_EXECUTABLE";
-		case CL_INVALID_KERNEL_NAME:
-			return "CL_INVALID_KERNEL_NAME";
-		case CL_INVALID_KERNEL_DEFINITION:
-			return "CL_INVALID_KERNEL_DEFINITION";
-		case CL_INVALID_KERNEL:
-			return "CL_INVALID_KERNEL";
-		case CL_INVALID_ARG_INDEX:
-			return "CL_INVALID_ARG_INDEX";
-		case CL_INVALID_ARG_VALUE:
-			return "CL_INVALID_ARG_VALUE";
-		case CL_INVALID_ARG_SIZE:
-			return "CL_INVALID_ARG_SIZE";
-		case CL_INVALID_KERNEL_ARGS:
-			return "CL_INVALID_KERNEL_ARGS";
-		case CL_INVALID_WORK_DIMENSION:
-			return "CL_INVALID_WORK_DIMENSION";
-		case CL_INVALID_WORK_GROUP_SIZE:
-			return "CL_INVALID_WORK_GROUP_SIZE";
-		case CL_INVALID_WORK_ITEM_SIZE:
-			return "CL_INVALID_WORK_ITEM_SIZE";
-		case CL_INVALID_GLOBAL_OFFSET:
-			return "CL_INVALID_GLOBAL_OFFSET";
-		case CL_INVALID_EVENT_WAIT_LIST:
-			return "CL_INVALID_EVENT_WAIT_LIST";
-		case CL_INVALID_EVENT:
-			return "CL_INVALID_EVENT";
-		case CL_INVALID_OPERATION:
-			return "CL_INVALID_OPERATION";
-		case CL_INVALID_GL_OBJECT:
-			return "CL_INVALID_GL_OBJECT";
-		case CL_INVALID_BUFFER_SIZE:
-			return "CL_INVALID_BUFFER_SIZE";
-		case CL_INVALID_MIP_LEVEL:
-			return "CL_INVALID_MIP_LEVEL";
-		case CL_INVALID_GLOBAL_WORK_SIZE:
-			return "CL_INVALID_GLOBAL_WORK_SIZE";
-		case CL_INVALID_DEVICE_QUEUE:
-			return "CL_INVALID_DEVICE_QUEUE";
-		case CL_INVALID_PIPE_SIZE:
-			return "CL_INVALID_PIPE_SIZE";
-		default:
-			return "unknown error code";
+		switch (errorCode) {
+		case -9999:											return "Illegal read or write to a buffer";		// NVidia error code
+		case CL_DEVICE_NOT_FOUND:							return "CL_DEVICE_NOT_FOUND";
+		case CL_DEVICE_NOT_AVAILABLE:						return "CL_DEVICE_NOT_AVAILABLE";
+		case CL_COMPILER_NOT_AVAILABLE:						return "CL_COMPILER_NOT_AVAILABLE";
+		case CL_MEM_OBJECT_ALLOCATION_FAILURE:				return "CL_MEM_OBJECT_ALLOCATION_FAILURE";
+		case CL_OUT_OF_RESOURCES:							return "CL_OUT_OF_RESOURCES";
+		case CL_OUT_OF_HOST_MEMORY:							return "CL_OUT_OF_HOST_MEMORY";
+		case CL_PROFILING_INFO_NOT_AVAILABLE:				return "CL_PROFILING_INFO_NOT_AVAILABLE";
+		case CL_MEM_COPY_OVERLAP:							return "CL_MEM_COPY_OVERLAP";
+		case CL_IMAGE_FORMAT_MISMATCH:						return "CL_IMAGE_FORMAT_MISMATCH";
+		case CL_IMAGE_FORMAT_NOT_SUPPORTED:					return "CL_IMAGE_FORMAT_NOT_SUPPORTED";
+		case CL_BUILD_PROGRAM_FAILURE:						return "CL_BUILD_PROGRAM_FAILURE";
+		case CL_MAP_FAILURE:								return "CL_MAP_FAILURE";
+		case CL_MISALIGNED_SUB_BUFFER_OFFSET:				return "CL_MISALIGNED_SUB_BUFFER_OFFSET";
+		case CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST:	return "CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST";
+		case CL_INVALID_VALUE:								return "CL_INVALID_VALUE";
+		case CL_INVALID_DEVICE_TYPE:						return "CL_INVALID_DEVICE_TYPE";
+		case CL_INVALID_PLATFORM:							return "CL_INVALID_PLATFORM";
+		case CL_INVALID_DEVICE:								return "CL_INVALID_DEVICE";
+		case CL_INVALID_CONTEXT:							return "CL_INVALID_CONTEXT";
+		case CL_INVALID_QUEUE_PROPERTIES:					return "CL_INVALID_QUEUE_PROPERTIES";
+		case CL_INVALID_COMMAND_QUEUE:						return "CL_INVALID_COMMAND_QUEUE";
+		case CL_INVALID_HOST_PTR:							return "CL_INVALID_HOST_PTR";
+		case CL_INVALID_MEM_OBJECT:							return "CL_INVALID_MEM_OBJECT";
+		case CL_INVALID_IMAGE_FORMAT_DESCRIPTOR:			return "CL_INVALID_IMAGE_FORMAT_DESCRIPTOR";
+		case CL_INVALID_IMAGE_SIZE:							return "CL_INVALID_IMAGE_SIZE";
+		case CL_INVALID_SAMPLER:							return "CL_INVALID_SAMPLER";
+		case CL_INVALID_BINARY:								return "CL_INVALID_BINARY";
+		case CL_INVALID_BUILD_OPTIONS:						return "CL_INVALID_BUILD_OPTIONS";
+		case CL_INVALID_PROGRAM:							return "CL_INVALID_PROGRAM";
+		case CL_INVALID_PROGRAM_EXECUTABLE:					return "CL_INVALID_PROGRAM_EXECUTABLE";
+		case CL_INVALID_KERNEL_NAME:						return "CL_INVALID_KERNEL_NAME";
+		case CL_INVALID_KERNEL_DEFINITION:					return "CL_INVALID_KERNEL_DEFINITION";
+		case CL_INVALID_KERNEL:								return "CL_INVALID_KERNEL";
+		case CL_INVALID_ARG_INDEX:							return "CL_INVALID_ARG_INDEX";
+		case CL_INVALID_ARG_VALUE:							return "CL_INVALID_ARG_VALUE";
+		case CL_INVALID_ARG_SIZE:							return "CL_INVALID_ARG_SIZE";
+		case CL_INVALID_KERNEL_ARGS:						return "CL_INVALID_KERNEL_ARGS";
+		case CL_INVALID_WORK_DIMENSION:						return "CL_INVALID_WORK_DIMENSION";
+		case CL_INVALID_WORK_GROUP_SIZE:					return "CL_INVALID_WORK_GROUP_SIZE";
+		case CL_INVALID_WORK_ITEM_SIZE:						return "CL_INVALID_WORK_ITEM_SIZE";
+		case CL_INVALID_GLOBAL_OFFSET:						return "CL_INVALID_GLOBAL_OFFSET";
+		case CL_INVALID_EVENT_WAIT_LIST:					return "CL_INVALID_EVENT_WAIT_LIST";
+		case CL_INVALID_EVENT:								return "CL_INVALID_EVENT";
+		case CL_INVALID_OPERATION:							return "CL_INVALID_OPERATION";
+		case CL_INVALID_GL_OBJECT:							return "CL_INVALID_GL_OBJECT";
+		case CL_INVALID_BUFFER_SIZE:						return "CL_INVALID_BUFFER_SIZE";
+		case CL_INVALID_MIP_LEVEL:							return "CL_INVALID_MIP_LEVEL";
+		case CL_INVALID_GLOBAL_WORK_SIZE:					return "CL_INVALID_GLOBAL_WORK_SIZE";
+		case CL_INVALID_DEVICE_QUEUE:						return "CL_INVALID_DEVICE_QUEUE";
+		case CL_INVALID_PIPE_SIZE:							return "CL_INVALID_PIPE_SIZE";
+		default:											return "unknown error code";
 		}
 	}
 	
 	void allocatemem(float *qx, float *qy, float* gx, float* gy);
 
-	void ReadOutput(float* outmat)
-	{
-		cout<<"\nReadOutput_chk0"<<flush;
+	void ReadOutput(float* outmat) {
 		cl_event readEvt;
-
-		cout<<"\nReadOutput_chk1"<<flush;
 		cl_int status = clEnqueueReadBuffer(m_queue,
 											dmem,
 											CL_FALSE,
@@ -239,16 +163,10 @@ public:
 											NULL,
 											&readEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-		cout<<"\nReadOutput_chk2_finished"<<flush;
 	}
 
-///home/nick/programming/ComputerVision/DTAM/dtam-opencl-implemention/codes/DtamRealizition/RunCL.cpp:191:27: error: no matching function for call to ‘RunCL::ReadOutput(uchar*&, _cl_mem*&, size_t&)’
-	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size)
-	{
-		cout<<"\nReadOutput_chk0"<<flush;
+	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size) {
 		cl_event readEvt;
-
-		cout<<"\nReadOutput_chk1"<<flush;
 		cl_int status = clEnqueueReadBuffer(m_queue,
 											buf_mem,
 											CL_FALSE,
@@ -259,7 +177,6 @@ public:
 											NULL,
 											&readEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-		cout<<"\nReadOutput_chk2_finished"<<flush;
 	}
 
 	void CleanUp();

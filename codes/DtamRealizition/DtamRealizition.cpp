@@ -51,9 +51,6 @@ int main()
 	boost::filesystem::create_directory(temp_path);
 
 	cout << "\n main_chk 1.2\n" << flush;
-	///////
-	//return 0;
-
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;
 	double reconstructionScale = 1;
 	int inc = 1;
@@ -62,8 +59,6 @@ int main()
 	for (int i =0; i < 11; i += inc) {                                             // Load images & data from file into c++ vectors
 		Mat tmp, d, image;
 		int offset = 462;//0;// better location in this dataset for translation for paralax flow.#################### TODO use a control file specifying where to sample the video.
-		//cout << "chk 2.1\n" << flush;
-		//cout << "i = " << i << ", offset = " << offset << ".\n" << flush;
 
 		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop", // NB need to replace with launch file
                    //"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
@@ -74,7 +69,6 @@ int main()
 			cameraMatrix,
 			R,
 			T);
-		//cout << "chk 2.2\n" << flush;
 		cout << ", image.size="<<image.size;
 
 		images.push_back(image);
@@ -84,24 +78,19 @@ int main()
 		Rs0.push_back(R.clone());
 		Ts0.push_back(T.clone());
 		D0.push_back(1 / d);
-		//cout << "chk 2.3\n" << flush;
 	}
 
 	cout << "\n main_chk 3\n" << flush;
 	//Setup camera matrix
 	double sx = reconstructionScale;
 	double sy = reconstructionScale;
-
-	int layers = 32;
-	int imagesPerCV = 10;
-	float occlusionThreshold = .05;
-
-	int startAt = 0;
-
+	int layers 					= 32;
+	int imagesPerCV 			= 10;
+	float occlusionThreshold 	= .05;
+	int startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
                                                                                    // Instantiate CostVol ///////////
 	CostVol cv(images[startAt], (FrameID)startAt, layers, 0.015, 0.0, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold);
-
 
 	cout << "\n main_chk 4\n" << flush;
 	cout << "calculate cost volume: ================================================" << endl << flush;
