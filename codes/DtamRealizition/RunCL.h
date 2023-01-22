@@ -1,6 +1,7 @@
 #pragma once
 
 #include <CL/cl.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
@@ -13,11 +14,14 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
+#include <boost/filesystem.hpp>
+#include <boost/format.hpp>
+
 using namespace std;
 class RunCL
 {
 public:
-	RunCL();
+	RunCL(boost::filesystem::path out_path);
 	
 	std::vector<cl_platform_id> m_platform_ids;
 	cl_context                  m_context;
@@ -35,6 +39,9 @@ public:
 	cl_device_id deviceId;  
 	
 	int width, height;
+
+	std::map< std::string, boost::filesystem::path > paths;
+	void createFolders(boost::filesystem::path out_path); // NB called by RunCL(..) constructor, above.
 
 	int  convertToString(const char *filename, std::string& s)
 	{
@@ -65,6 +72,9 @@ public:
 		cout << "Error: failed to open file\n:" << filename << endl;
 		return 1;
 	}
+
+	void DownloadAndSave(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat );
+	//void DownloadAndSave(cl_mem buffer, boost::filesystem::path folder, size_t size);
 
 	void calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
     /*	
@@ -162,6 +172,7 @@ public:
 											0,
 											NULL,
 											&readEvt);
+		clFlush(m_queue);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 	}
 

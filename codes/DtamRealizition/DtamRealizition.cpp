@@ -1,7 +1,7 @@
 // DtamRealizition.cpp : 定义控制台应用程序的入口点。
 //
 //#include "stdafx.h"   // windows precompiled header file
-#include <boost/filesystem.hpp>
+//#include <boost/filesystem.hpp> // included from RunCl.h, via CostVol.h
 #include "CostVol.h"
 
 #include "fileLoader.hpp"
@@ -28,13 +28,15 @@ int main()
 	Mat cameraMatrix = (Mat_<double>(3, 3) << 481.20, 0.0, 319.5,  // TODO where do these values come from ? See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
 		0.0, 480.0, 239.5,
 		0.0, 0.0, 1.0);
-	cout << "\n main_chk 1\n" << flush;
 
-	// make output directory
+	cout << "\n main_chk 1\n" << flush;  	// make output folders ////////////////////////////////////////////////////////////
 	std::time_t result = std::time(nullptr);
-	const std::string out_dir = std::asctime(std::localtime(&result));
+	std::string out_dir = std::asctime(std::localtime(&result));
+	out_dir.pop_back(); // req to remove new_line from end of string.
 	boost::filesystem::path out_path(boost::filesystem::current_path());
-	out_path += "/../../output/";// + out_dir;
+	out_path= out_path.parent_path();												// move "out_path" up two levels in the directory tree.
+	out_path= out_path.parent_path();
+	out_path += "/output/";// + out_dir;
 
 	if(boost::filesystem::create_directory(out_path)) {
 		std::cerr<< "Directory Created: "<<out_path<<std::endl;
@@ -43,25 +45,41 @@ int main()
 	out_path +=  out_dir;
 	cout <<"Creating output directories: "<< out_path <<std::endl;
 	boost::filesystem::create_directory(out_path);//, ec);
-	boost::filesystem::path temp_path = out_path;
-	temp_path += "/a";
-	boost::filesystem::create_directory(temp_path);
-	temp_path = out_path;
-	temp_path += "/b";
-	boost::filesystem::create_directory(temp_path);
+	out_path += "/";
 
-	cout << "\n main_chk 1.2\n" << flush;
+/*
+	/////////////   move the rest to a fn in RunCL.///////
+	boost::filesystem::path temp_path = out_path;
+																					// Vector of device buffer names
+	std::vector<std::string> names = {"basemem","imgmem","cdatabuf","hdatabuf","pbuf","qxmem","qymem","dmem", "amem","basegraymem","gxmem","gymem","g1mem","gqxmem","gqymem","lomem","himem"};
+
+	std::pair<std::string, boost::filesystem::path> tempPair;
+	std::map <std::string, boost::filesystem::path> paths;
+
+	for (std::string key : names){
+		temp_path = out_path;
+		temp_path += key;
+		tempPair = {key, temp_path};
+		paths.insert(tempPair);
+		boost::filesystem::create_directory(temp_path);
+	}
+    cout << "KEY\tPATH\n";															// print the folder paths
+    for (auto itr = paths.begin(); itr != paths.end(); ++itr) {
+        cout << "First:["<<  itr->first << "]\t:\t Second:" << itr->second << "\n";
+    }																				// Now pass the map "paths" to RunCl, to use for saving data.
+*/
+	cout << "\n main_chk 1.2\n" << flush; ////////////////////////////////////////////////////////////////////////////////
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;
 	double reconstructionScale = 1;
 	int inc = 1;
 
 	cout << "\n main_chk 2\n" << flush;
-	for (int i =0; i < 11; i += inc) {                                             // Load images & data from file into c++ vectors
+	for (int i =0; i < 11; i += inc) {												// Load images & data from file into c++ vectors
 		Mat tmp, d, image;
-		int offset = 462;//0;// better location in this dataset for translation for paralax flow.#################### TODO use a control file specifying where to sample the video.
-
-		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop", // NB need to replace with launch file
-                   //"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
+		int offset = 462;//0;// better location in this dataset for translation for paralax flow.
+																					// TODO use a control file specifying where to sample the video.
+		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
+	//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
 			65535,
 			i + offset,
 			image,
@@ -82,15 +100,17 @@ int main()
 
 	cout << "\n main_chk 3\n" << flush;
 	//Setup camera matrix
-	double sx = reconstructionScale;
-	double sy = reconstructionScale;
+	double sx 					= reconstructionScale;
+	double sy 					= reconstructionScale;
 	int layers 					= 32;
 	int imagesPerCV 			= 10;
 	float occlusionThreshold 	= .05;
 	int startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
                                                                                    // Instantiate CostVol ///////////
-	CostVol cv(images[startAt], (FrameID)startAt, layers, 0.015, 0.0, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold);
+	CostVol cv(images[startAt], (FrameID)startAt, layers, 0.015, 0.0, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path);
+
+//	return 0; //#################### early halt #################################
 
 	cout << "\n main_chk 4\n" << flush;
 	cout << "calculate cost volume: ================================================" << endl << flush;

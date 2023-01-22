@@ -70,10 +70,22 @@ void CostVol::checkInputs(
 
 CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	float _far, cv::Mat R, cv::Mat T, cv::Mat _cameraMatrix, float occlusionThreshold,
-	float initialCost, float initialWeight) // NB defaults: float initialCost = 3.0, float initialWeight = .001
+	boost::filesystem::path out_path,
+	float initialCost, float initialWeight
+) // NB defaults: float initialCost = 3.0, float initialWeight = .001
 	:
-	R(R), T(T), occlusionThreshold(occlusionThreshold), initialWeight(initialWeight)
+	R(R), T(T), occlusionThreshold(occlusionThreshold), initialWeight(initialWeight), cvrc(out_path) // constructors for member classes //
 {
+	/*
+	cout << "CostVol_chk -1\n" << flush;
+	cout << "KEY\tPATH\n";															// print the folder paths
+    for (auto itr = paths.begin(); itr != paths.end(); ++itr) {
+        cout << "First:["<<  itr->first << "]\t:\t Second:" << itr->second << "\n";
+    }
+	*/
+	//cvrc(out_path);   // ? how to instantiate ?
+	//cvrc.printPaths();
+
 	std::cout << "CostVol_chk 0\n" << std::flush;
 	//For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
 	CV_Assert(image.rows % 32 == 0 && image.cols % 32 == 0 && image.cols >= 64);
@@ -123,7 +135,7 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
     
 	cout << "CostVol_chk 4\n" << flush;
 	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
-	baseImageGray = baseImageGray.reshape(0, rows);			// TODO NB baseImageGray currently unused.
+	baseImageGray = baseImageGray.reshape(0, rows);			// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
 	
 	cout << "CostVol_chk 5\n" << flush;
     count      = 0;

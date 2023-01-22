@@ -60,7 +60,7 @@ __kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kern
 		int ny = (int)(yiz / wiz);
 		unsigned int coff = ny * cols + nx;			// offset of pixel in new frame. TODO interpolated sample of pixel.
 
-		if(coff<0 || coff>=293887/*layerStep*/ || ny<0 || ny>=rows || nx<0 || nx>=cols){/*printf("coff=%2.5i,",coff);*/continue;}
+		if(coff<0 || coff>=layerStep/*293887*//*layerStep*/ || ny<0 || ny>=rows || nx<0 || nx>=cols){/*printf("coff=%2.5i,",coff);*/continue;}
 		// sampled pixel outside off image  TODO check the effect on DTAM's logic of pixels outside the image.
 		char3 c = img[coff];						// c = rgb values of pixel in new frame
 
@@ -72,7 +72,8 @@ __kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kern
 		v3 = abs(c.z - B.z);
 		del = v1 + v2 + v3;
 		del = fmin(del, thresh)*3.0f / thresh;		//
-		if (offset<10)printf("\n\nrows=%i, cols=%i, ##########################################################", rows, cols);
+		/*
+		//if (offset<10)printf("\n\nrows=%i, cols=%i, ##########################################################", rows, cols);
 		// it seems the img buffer is too short.
 		//if(coff<10){printf("C=%i,%i,%i: ",c.x,c.y,c.z);}//B=%i,%i,%i  ,B.x,B.y,B.z  // offset== (640 * 458) crashes
 		//if(offset== (640 * 472)){printf("B=%i,%i,%i: ",B.x,B.y,B.z);}
@@ -83,10 +84,11 @@ __kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kern
 			//printf("\ncoff=%i, offset=%i, img[offset]=%i,%i,%i",coff, offset, img[offset].x, img[offset].y, img[offset].z);
 			//printf("\ncoff=%i, offset=%i, img[coff]=%i,%i,%i",coff, offset, img[coff].x, img[coff].y, img[coff].z);
 		//}
+		*/
 		if (c.x + c.y + c.z != 0)		{ // crash happens here
 			ns = (c0*w + del) / (w + 1);
 			cdata[offset + z*layerStep] = ns;			// Costdata, same location c0 was read from.
-			hdata[offset + z*layerStep] = w + 1;		// Wieghtdata, same location w  was read from.
+			hdata[offset + z*layerStep] = w + 1;		// Weightdata, same location w  was read from.
 		}else{
 			ns = c0;
 		}

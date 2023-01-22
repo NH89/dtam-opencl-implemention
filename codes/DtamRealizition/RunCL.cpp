@@ -5,9 +5,12 @@
 #define SDK_FAILURE 1
 using namespace std;
 
-RunCL::RunCL() // constructor
+RunCL::RunCL(boost::filesystem::path out_path) // constructor
 {
-	cout << "RunCL_chk 0\n" << flush;
+	cout << "\nRunCL_chk -1\n" << flush;
+	createFolders(out_path);
+
+	cout << "\nRunCL_chk 0\n" << flush;
 	/*Step1: Getting platforms and choose an available one.*////////////////////////////////////////////////////////////
 	cl_uint numPlatforms;	//the NO. of platforms
 	cl_platform_id platform = NULL;	//the chosen platform
@@ -22,14 +25,15 @@ RunCL::RunCL() // constructor
 	if (numPlatforms > 0){
 		cl_platform_id* platforms = (cl_platform_id*)malloc(numPlatforms * sizeof(cl_platform_id));
 		status = clGetPlatformIDs(numPlatforms, platforms, NULL);
-		platform = platforms[1]; //0 or 1 , Need to choose platform and GPU ##################################### Choose platform ##############
 		cout << "platforms[0] = " << platforms[0] << ", \nplatforms[1] = " << platforms[1] << "\n" << flush;
+		int n=0; // 0 or 1
+		cout << "\nSelected platform number :"<<n<<"\n"<<flush;
+		platform = platforms[n]; //0 or 1 , Need to choose platform and GPU ##################################### Choose platform ############## TODO replace with launch yaml file.
 		free(platforms);
 	}
-	cout << "cl_platform_id platform = " << platform ; 
+	cout << "cl_platform_id platform = " << platform ;
 
-	cout << "\nRunCL_chk 1\n" << flush;
-	/*Step 2:Query the platform and choose the first GPU device if has one.Otherwise use the CPU as device.*/////////////
+	cout << "\nRunCL_chk 1\n" << flush; /*Step 2:Query the platform and choose the first GPU device if has one.Otherwise use the CPU as device.*/////////////
 	cl_uint				numDevices = 0;
 	cl_device_id        *devices;
 	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
@@ -37,18 +41,16 @@ RunCL::RunCL() // constructor
 
 	cout << "RunCL_chk 2\n" << flush;
 	if (numDevices == 0){	//no GPU available.
-		cout << "No GPU device available." << endl;
-		cout << "Choose CPU as default device." << endl;
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 0, NULL, &numDevices);
+		cout << "No GPU device available. Choose CPU as default device." << endl;
+		status  = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 0, NULL, &numDevices);
 		devices = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id));
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, numDevices, devices, NULL);
+		status  = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, numDevices, devices, NULL);
 	}else{
 		devices = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id));
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
+		status  = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
 	}
-	cout << "RunCL_chk 3\n" << flush;
-	cout << "cl_device_id  devices = " << devices << "\n" << flush;   // pointer to array of unkown length...
-	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+	cout << "RunCL_chk 3\n" << flush; cout << "cl_device_id  devices = " << devices << "\n" << flush;   // pointer to array of unkown length...
+	if (status != CL_SUCCESS) {cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 
 	/*Step 3: Create context.*///////////////////////////////////////////////////////////////////////////////////////////
 	 cl_context_properties cps[3] ={
@@ -75,8 +77,7 @@ RunCL::RunCL() // constructor
 													&status);
 	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 
-	cout << "RunCL_chk 5\n" << flush;
-	/*Step 5: Create program object *////////////////////////////////////////////////////////////////////////////////////
+	cout << "RunCL_chk 5\n" << flush; /*Step 5: Create program object *////////////////////////////////////////////////////////////////////////////////////
 	const char *filename = "/home/nick/Programming/ComputerVision/DTAM/dtam-opencl-implemention/codes/DtamRealizition/DTAM_kernels2.cl"; //"DTAM_kernels2.cl";
 	string sourceStr;
 	status = convertToString(filename, sourceStr);
@@ -85,8 +86,7 @@ RunCL::RunCL() // constructor
 	m_program = clCreateProgramWithSource(m_context, 1, &source, sourceSize, NULL);
 	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 
-	cout << "RunCL_chk 6\n" << flush;
-	/*Step 6: Build program. *///////////////////////////////////////////////////////////////////////////////////////////
+	cout << "RunCL_chk 6\n" << flush; /*Step 6: Build program. *///////////////////////////////////////////////////////////////////////////////////////////
 	status = clBuildProgram(m_program, 1, devices, NULL, NULL, NULL);
 	if (status != CL_SUCCESS){
 		printf("\nclBuildProgram failed: %d\n", status);
@@ -96,17 +96,16 @@ RunCL::RunCL() // constructor
 		exit_(status);//return;
 	}
 
-	cout << "RunCL_chk 7\n" << flush;
-	//*Step 7: Create kernel object. *///////////////////////////////////////////////////////////////////////////////////
+	cout << "RunCL_chk 7\n" << flush; //*Step 7: Create kernel object. *///////////////////////////////////////////////////////////////////////////////////
 	cost_kernel = clCreateKernel(m_program, "BuildCostVolume", NULL);
     /*
-	//min_kernel = clCreateKernel(m_program, "CostMin", NULL);
+	//min_kernel   = clCreateKernel(m_program, "CostMin", NULL);
 	//optiQ_kernel = clCreateKernel(m_program, "OptimizeQ", NULL);
 	//optiD_kernel = clCreateKernel(m_program, "OptimizeD", NULL);
 	//optiA_kernel = clCreateKernel(m_program, "OptimizeA", NULL);
     */
-	cache1_kernel = clCreateKernel(m_program,  "CacheG1", NULL);
-	cache2_kernel = clCreateKernel(m_program,  "CacheG2", NULL);
+	cache1_kernel  = clCreateKernel(m_program, "CacheG1", NULL);
+	cache2_kernel  = clCreateKernel(m_program, "CacheG2", NULL);
 	updateQ_kernel = clCreateKernel(m_program, "UpdateQ", NULL);
 	updateD_kernel = clCreateKernel(m_program, "UpdateD", NULL);
 	updateA_kernel = clCreateKernel(m_program, "UpdateA", NULL);
@@ -117,6 +116,42 @@ RunCL::RunCL() // constructor
 	basegraymem=gxmem=gymem=g1mem=gqxmem=gqymem=lomem=himem=0;
 
 	cout << "RunCL_chk 9\n" << flush;
+}
+
+
+void RunCL::createFolders(boost::filesystem::path out_path){
+	boost::filesystem::path temp_path = out_path;
+																					// Vector of device buffer names
+	std::vector<std::string> names = {"basemem","imgmem","cdatabuf","hdatabuf","pbuf","qxmem","qymem","dmem", "amem","basegraymem","gxmem","gymem","g1mem","gqxmem","gqymem","lomem","himem"};
+
+	std::pair<std::string, boost::filesystem::path> tempPair;
+	//std::map <std::string, boost::filesystem::path> paths;
+
+	for (std::string key : names){
+		temp_path = out_path;
+		temp_path += key;
+		tempPair = {key, temp_path};
+		paths.insert(tempPair);
+		boost::filesystem::create_directory(temp_path);
+	}
+	cout << "\nRunCL::createFolders() chk1\n";
+    cout << "KEY\tPATH\n";															// print the folder paths
+    for (auto itr = paths.begin(); itr != paths.end(); ++itr) {
+        cout << "First:["<<  itr->first << "]\t:\t Second:" << itr->second << "\n";
+    }
+    cout<<"\npaths.at(\"basemem\")="<<paths.at("basemem")<<"\n"<<flush;
+}
+
+
+void RunCL::DownloadAndSave(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat ){
+		cv::Mat temp_mat(size_mat, type_mat);
+		ReadOutput(temp_mat.data, basemem,  image_size_bytes);
+		cout<<"\nDownloadAndSave: filename = ["<<folder.filename()<<"] folder = ["<<folder<<"]\n"<<flush;
+		stringstream ss;
+		ss << "/" << folder.filename().string() << "_" << count << ".bmp";
+		cv::imshow(ss.str(), temp_mat);
+		folder += ss.str();
+		cv::imwrite(folder.string(), temp_mat);
 }
 
 
@@ -158,8 +193,12 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		/// Debug img chk
 		cv::Mat temp_mat(baseImage.size(), baseImage.type());
 		ReadOutput(temp_mat.data, basemem,  image_size_bytes);
-		cv::imshow("Img_downloaded", temp_mat);
-		cv::waitKey(-1);
+		cv::imshow("basemem_downloaded", temp_mat);
+		//cv::waitKey(100);
+		clFlush(m_queue);
+		DownloadAndSave(basemem, /*count*/ 0, paths.at("basemem"), image_size_bytes, baseImage.size(), baseImage.type() );
+	//void RunCL::DownloadAndSave(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat )
+	//	DownloadAndSave( basemem, paths.at("basemem"), image_size_bytes, baseImage.size(), baseImage.type() );
 
 		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer imgmem ###########
 			imgmem,
@@ -178,8 +217,8 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 
 		/// Debug img chk
 		ReadOutput(temp_mat.data, imgmem,  image_size_bytes);
-		cv::imshow("Img_downloaded", temp_mat);
-		cv::waitKey(-1);
+		cv::imshow("imgmem_downloaded", temp_mat);
+		//::waitKey(-1);
 
 		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer cdatabuf #########
 			cdatabuf,
@@ -262,7 +301,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 		cout<<"\nwidth="<<width ;			//7
 		//cout<<"\nlomem="<<lomem ;			//8  lomem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res); // used between kernels.
 		//cout<<"\nhimem="<<himem ;			//9  himem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
-		//cout<<"\namem="<<amem ;			//10  amem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
+		//cout<<"\namem="<<amem ;			//10 amem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
 		//cout<<"\ndmem="<<dmem ;			//11 dmem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
 		cout<<"\nlayers="<<layers ;			//12 layers = 32
 		cout<<"\n"<<flush;
@@ -290,8 +329,8 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 	}
 	else // if the device buffers already exist ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	{											////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		cout << "\ncalcCostVol chk8," << flush;
-		cout << "\n\nm_queue=" <<m_queue<<
+		cout << "\n\ncalcCostVol chk8," << flush;
+		cout << "\nm_queue=" <<m_queue<<
 				"\n imgmem=" <<imgmem<<
 				"\n CL_FALSE=" <<CL_FALSE<<
 				"\n width*height*pixelSize=" <<width*height*pixelSize<<
@@ -315,8 +354,8 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 
 		cv::Mat temp_mat(baseImage.size(), baseImage.type());
 		ReadOutput(temp_mat.data, imgmem,  image_size_bytes);
-		cv::imshow("Img_downloaded", temp_mat);
-		cv::waitKey(-1);
+		cv::imshow("imgmem_downloaded", temp_mat);
+		//cv::waitKey(-1);
 																			// flush command queue to device 			// wait for device to complete execution
 		status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) clEnqueueWriteBuffer imgmem status = " << checkerror(status) <<"\n"<<flush; exit_(status); }
 		status = clWaitForEvents(1, &writeEvt); if (status != CL_SUCCESS)	{ cout << "\nclWaitForEvents clEnqueueWriteBuffer imgmem status = "<<status<<"  "<<checkerror(status) <<"\n"<<flush; exit_(status); }
@@ -375,7 +414,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 	cv::Mat temp_mat(baseImage.size(), baseImage.type());
 	ReadOutput(temp_mat.data, basemem,  image_size_bytes);
 	cv::imshow("Img_downloaded_after_cost_kernel", temp_mat);
-	cv::waitKey(-1);
+	cv::waitKey(100);
 
 	cout << "\ncalcCostVol chk13_finished\n" << flush;
 /*
@@ -723,7 +762,16 @@ void RunCL::cacheGValue(cv::Mat &bgray)
 	res = clEnqueueNDRangeKernel(m_queue, cache2_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run cache2_kernel  aka CacheG2(..) #####################
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 
-	cout<<"\ncacheGValue_chk_7_finished"<<flush;
+	cout<<"\ncacheGValue_chk7"<<flush;
+	// download & save buffers that were writtent to.
+
+
+
+
+
+
+
+	cout<<"\ncacheGValue_chk_8_finished"<<flush;
 }
 
 
@@ -789,7 +837,17 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 	res = clEnqueueNDRangeKernel(m_queue, updateD_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run updateD_kernel  aka UpdateD(..) ####################
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 
-	cout<<"\nupdateQD_chk8_finished\n"<<flush;
+
+	cout<<"\nupdateQD_chk8"<<flush;
+	// download & save buffers that were writtent to.
+
+
+
+
+
+
+
+	cout<<"\nupdateQD_chk9_finished\n"<<flush;
 }
 
 
@@ -810,4 +868,18 @@ void RunCL::updateA(int layers, float lambda,float theta)
 
 	res = clEnqueueNDRangeKernel(m_queue, updateA_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run updateA_kernel  aka UpdateA(..) ####################
 	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
+
+	cout<<"\nupdateA_chk1"<<flush;
+	// download & save buffers that were writtent to.
+
+
+
+
+
+
+
+
+
+
+	cout<<"\nupdateA_chk2_finished"<<flush;
 }

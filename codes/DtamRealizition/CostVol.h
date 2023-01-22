@@ -20,8 +20,8 @@ typedef size_t st;
 class CostVol
 {
 public:
-	CostVol()
-	{};
+	//CostVol()
+	//{};
 	~CostVol();
 
 	FrameID fid;
@@ -37,6 +37,7 @@ public:
 	cv::Mat cameraMatrix;//Note! should be in OpenCV format
 	float occlusionThreshold;
 	
+
 	RunCL cvrc;
 
 	cv::Mat projection;//projects world coordinates (x,y,z) into (rows,cols,layers)
@@ -48,10 +49,14 @@ public:
 	Mat costdata, hit;
 	int count, QDruncount, Aruncount;
 	void updateCost(const cv::Mat& image, const cv::Mat& R, const cv::Mat& T);//Accepts pinned RGBA8888 or BGRA8888 for high speed
-	
+
 	CostVol(cv::Mat image, FrameID _fid, int _layers, float _near, float _far,
-		cv::Mat R, cv::Mat T, cv::Mat _cameraMatrix, float occlusionThreshold,
-		 float initialCost = 3.0, float initialWeight = .001);
+		cv::Mat R, cv::Mat T, cv::Mat _cameraMatrix,
+		 float occlusionThreshold,
+		 boost::filesystem::path out_path,
+		 float initialCost = 3.0,
+		 float initialWeight = .001
+		 );
 
 	void initOptimization();
     /*
