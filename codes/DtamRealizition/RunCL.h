@@ -1,6 +1,7 @@
 #pragma once
 
-#include <CL/cl.h>
+//#include <CL/cl.h>  // included via <CL/cl.hpp> & CL/opencl.h
+#include <CL/cl.hpp>
 
 #include <cstdio>
 #include <cstdlib>
@@ -38,7 +39,12 @@ public:
 	bool amdPlatform;     
 	cl_device_id deviceId;  
 	
-	int width, height;
+	int width, height, costVolLayers;
+	int count=0, keyFrameCount=0, costVolCount=0, QDcount=0, Acount=0;
+
+	size_t image_size_bytes;
+	cv::Size baseImage_size;
+	int baseImage_type;
 
 	std::map< std::string, boost::filesystem::path > paths;
 	void createFolders(boost::filesystem::path out_path); // NB called by RunCL(..) constructor, above.
@@ -73,17 +79,16 @@ public:
 		return 1;
 	}
 
-	void DownloadAndSave(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat );
+	void DownloadAndSave(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show);
 	//void DownloadAndSave(cl_mem buffer, boost::filesystem::path folder, size_t size);
+
+	void DownloadAndSaveVolume(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
 
 	void calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
     /*	
-//	void minv(float *loInd, float *loVal, int layers);
-	 
+	//void minv(float *loInd, float *loVal, int layers);
 	//void optiQ(float sigma_q,float epsilon,float denom);
-
 	//void optiD(float sigma_d,float epsilon,float denom, float theta);
-
 	//void optiA(float theta,float ds,float lamda,int l,int layerstep);
     */
 	
@@ -173,21 +178,28 @@ public:
 											NULL,
 											&readEvt);
 		clFlush(m_queue);
+		//clFinish(m_queue);
+		//clReleaseEvent(readEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 	}
 
-	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size) {
+	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size, size_t offset=0) {
 		cl_event readEvt;
+		cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<"\t"<<flush;
 		cl_int status = clEnqueueReadBuffer(m_queue,
 											buf_mem,
 											CL_FALSE,
-											0,
+											offset,
 											data_size,
 											outmat,
 											0,
 											NULL,
 											&readEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+		clFlush(m_queue);
+		clFinish(m_queue);
+		//clReleaseEvent(readEvt);
+		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\t"<<flush; exit_(status);}
+		//cout<<"\nReadOutput finished\n"<<flush;
 	}
 
 	void CleanUp();

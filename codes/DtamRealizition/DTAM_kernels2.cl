@@ -15,11 +15,12 @@
 //  res = clSetKernelArg(cost_kernel, 12, sizeof(int),      &layers);
 */
 
-__kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kernel"       // called as "cost_kernel" in RunCL.cpp
-	__global char3* base,	//1
-	__global char3* img,	//2
+__kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
+	__global float* p,		//0  kernelArg numbers
+	__global uchar* base,	//1
+	__global uchar* img,	//2
 	__global float* cdata,	//3
-	__global float* hdata,	//4
+	__global float* hdata,	//4 'w'
 	int layerStep,			//5
 	float weight,			//6
 	int cols,				//7
@@ -27,87 +28,107 @@ __kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kern
 	__global float* hi,		//9
 	__global float* a,		//10
 	__global float* d,		//11
-	int layers)				//12 ??
+	int layers)				//12
 {
-	int xf = get_global_id(0); // TODO either pass rows in kernel args, OR compile const values for rows, cols, layers, layerStep.
-	int yf = xf / cols;
-	xf = xf % cols;
-	int rows = layerStep/cols;
-	unsigned int offset = xf + yf * cols; 	// i.e offset = global_id
-	if(offset>=layerStep){return;} // incase there are more threads than pixels.
+	//weight = 0.5;
+	int global_id = get_global_id(0);
+	int local_id  = get_local_id(0);
+	int xf = global_id; 							// TODO either pass rows in kernel args, OR compile const values for rows, cols, layers, layerStep.
+	int yf = xf / (cols);
+	xf = xf % (cols);
 
-	char3 B = base[offset];					// pixel from keyframe
-											// (wi,xi,yi)=homogeneous coords of keyframe _ray_. // Below old comments, meaning ??
-	float wi = p[8] * xf + p[9] * yf + p[11];       //  wi = p[lo_mem]     * global_id       + p[hi_mem]     * global_id/cols       + p[d_mem];
-	float xi = p[0] * xf + p[1] * yf + p[3];        //  xi = p[p_buf]      * global_id       + p[base_mem]   * global_id/cols       + p[c_data_buf];
-	float yi = p[4] * xf + p[5] * yf + p[7];        //  yi = p[h_data_buf] * global_id       + p[layer_step] * global_id/cols       + p[width];
+	int rows = layerStep/cols;
+	unsigned int offset_1 = xf + yf * cols; 			// i.e offset = global_id
+	unsigned int offset_3 = offset_1 * 3;
+	float xf_1 = xf;
+	float yf_1 = yf;
+	uchar3 B;	B.x = base[offset_3]; B.y = base[offset_3]; B.z = base[offset_3];							// pixel from keyframe
+													// (wi,xi,yi)=homogeneous coords of keyframe _ray_. // Below old comments, meaning ??
+	float wi = p[8] * xf_1 + p[9] * yf_1 + p[11];	//  wi = p[lo_mem]     * global_id       + p[hi_mem]     * global_id/cols       + p[d_mem];
+	float xi = p[0] * xf_1 + p[1] * yf_1 + p[3];	//  xi = p[p_buf]      * global_id       + p[base_mem]   * global_id/cols       + p[c_data_buf];
+	float yi = p[4] * xf_1 + p[5] * yf_1 + p[7];	//  yi = p[h_data_buf] * global_id       + p[layer_step] * global_id/cols       + p[width];
 	
 	float minv = 1000.0, maxv = 0.0, mini = 0;
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
-	for (unsigned int z = 0; z < layers/*1*/; z++) // for layers of cost vol...
+	unsigned int coff_11, coff_01, coff_10, coff_00;
+	uchar3  c;
+	float v1, v2, v3, del, ns;
+
+	for (unsigned int z = 0; z < layers/*1*/; z++)  // for layers of cost vol...
 	{
-		float c0 = cdata[offset + z*layerStep];		// cost for this elem of cost vol
-		float w = hdata[offset + z*layerStep];		// weighting for this elem in hdata (weights).
-		//if(offset%10000==0){printf("w=%2.5f,",w);}	// w = 001 initially
+		float c0 = cdata[offset_1 + z*layerStep];	// cost for this elem of cost vol
+		float w  = hdata[offset_1 + z*layerStep];	// weighting for this elem in hdata (weights). w = 001 initially
 													// (wiz,xiz,yiz)=homogeneous pixel coords in new frame of keyframe _point_.
 													// Below old comments, meaning ??
 		float wiz = wi + p[10] * z;                 					//  a_mem
 		float xiz = xi + p[2] * z;                  					//  base_mem
 		float yiz = yi + p[6] * z;                  					//  thresh
 													// (nx,ny)= integer pixel coords of point in new frame
-		int nx = (int)(xiz / wiz);
-		int ny = (int)(yiz / wiz);
-		unsigned int coff = ny * cols + nx;			// offset of pixel in new frame. TODO interpolated sample of pixel.
+		float nx = xiz / wiz;						// NB Need coords of 4 pixels around the projected point.
+		float ny = yiz / wiz;
+		if (ny<1 || nx<1 || ny >480 || nx>640) {ny=1; nx=1;} // test for out_of_image
 
-		if(coff<0 || coff>=layerStep/*293887*//*layerStep*/ || ny<0 || ny>=rows || nx<0 || nx>=cols){/*printf("coff=%2.5i,",coff);*/continue;}
-		// sampled pixel outside off image  TODO check the effect on DTAM's logic of pixels outside the image.
-		char3 c = img[coff];						// c = rgb values of pixel in new frame
+		int nx_ = ceil(nx);
+		int ny_ = ceil(ny);
 
-		float v1, v2, v3, del, ns;
-		float thresh = weight;
+		coff_11 = (ny_ * cols) + nx_;				// offset of pixel in new frame. TODO interpolated sample of pixel.
+		coff_10 = (ny_-1) * cols + nx_;
+		coff_01 = ny_     * cols + (nx_ -1);
+		coff_00 = (ny_-1) * cols + (nx_ -1);
 
-		v1 = abs(c.x - B.x);						// rgb photometric cost
-		v2 = abs(c.y - B.y);
-		v3 = abs(c.z - B.z);
-		del = v1 + v2 + v3;
-		del = fmin(del, thresh)*3.0f / thresh;		//
-		/*
-		//if (offset<10)printf("\n\nrows=%i, cols=%i, ##########################################################", rows, cols);
-		// it seems the img buffer is too short.
-		//if(coff<10){printf("C=%i,%i,%i: ",c.x,c.y,c.z);}//B=%i,%i,%i  ,B.x,B.y,B.z  // offset== (640 * 458) crashes
-		//if(offset== (640 * 472)){printf("B=%i,%i,%i: ",B.x,B.y,B.z);}
-	//if(offset<(640 * 480) && offset >(640 * 479.9) )//(offset<=(293887)&& offset>(293887-20))//(offset<(640 * 480) && offset >(640 * 479.9) )//{printf("B=%i,%i,%i: ",B.x,B.y,B.z);}
-			//293887 largest offset that does not crash. NB img[offset] near this are all (0,0,0).TODO Why ?
-		//{
-		//	printf("\ncoff=%i, offset=%i, ",coff, offset );
-			//printf("\ncoff=%i, offset=%i, img[offset]=%i,%i,%i",coff, offset, img[offset].x, img[offset].y, img[offset].z);
-			//printf("\ncoff=%i, offset=%i, img[coff]=%i,%i,%i",coff, offset, img[coff].x, img[coff].y, img[coff].z);
-		//}
-		*/
-		if (c.x + c.y + c.z != 0)		{ // crash happens here
-			ns = (c0*w + del) / (w + 1);
-			cdata[offset + z*layerStep] = ns;			// Costdata, same location c0 was read from.
-			hdata[offset + z*layerStep] = w + 1;		// Weightdata, same location w  was read from.
+		if(coff_11 >200000 && coff_11%1001==0)printf("(%i,%i,%i,%i,%i,%i,%i)",global_id,local_id,xf,yf,coff_11,nx,ny);
+		if (coff_11 > 307200*3) continue; 			// sampled pixel outside of image  TODO check the effect on DTAM's logic of pixels outside the image.
+
+		float3 c_11; 	c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
+		float3 c_10; 	c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
+		float3 c_01; 	c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
+		float3 c_00; 	c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
+
+		float factor_x = fmod(nx,1);
+		float factor_y = fmod(ny,1);
+		float3 c =  factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // bi-linear interpolation
+
+		float thresh = weight;						// occlusionThreshold set at 0.05 by default in main().
+
+		v1 = fabs(c.x - B.x);						// rgb photometric cost: bi-linear. ? should read the keyframe B as a float ?
+		v2 = fabs(c.y - B.y);
+		v3 = fabs(c.z - B.z);
+		del = v1 + v2 + v3;							// L1 norm between keyframe & new frame pixels.
+		del = fmin(del, thresh)*3.0f / thresh;		// if(del>0.05) del=3.0, else del=del*60  //  60=3/0.05 //  0.0<=del<=3.0
+
+		if (c.x + c.y + c.z != 0)		{ 			// If new image pixel is NOT black, (i.e. null, out of frame)
+			ns = (c0*w + del) / (w + 1);			// c0 = existing value in this costvol elem.
+			cdata[offset_1 + z*layerStep] = ns;		// Costdata, same location c0 was read from.
+			hdata[offset_1 + z*layerStep] = w + 1;	// Weightdata, same location w  was read from.
 		}else{
 			ns = c0;
 		}
-
 		if (ns < minv) {
 			minv = ns;
 			mini = z;
 		}
 		maxv = fmax(ns, maxv);
 	}
-	lo[offset] = minv;
-	a[offset]  = mini;
-	d[offset]  = mini;
-	hi[offset] = maxv;
+	lo[global_id] 	= minv;//base[offset_3];// base[offset_3];//.x;  // export the images as accessed by the kernel.
+	a[offset_1] 	= mini;
+	d[offset_1] 	= ns;
+	hi[offset_1] 	= del;//maxv;//img[coff_11*3];  //  export the images as accessed by the kernel.
 }
-  
+
 
  __kernel void CacheG1(__global char* base, __global float* g1p, int cols, int rows)                        // called as "cache1_kernel" in RunCL.cpp
  {
+	 /*
+	 int global_id = get_global_id(0);
+	 //int local_id  = get_local_id(0);
+	 int x = global_id; // local_work_size NB dynamic depend on gpu params TODO
+
+	 if(x> cols*rows){
+		 printf("\nx> cols*rows ##");
+		 return;
+	}                       // If out of range, don't process.
+	*/
 	 int x = get_global_id(0);
 	 int y = x / cols;
 	 x = x % cols;
@@ -119,6 +140,7 @@ __kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kern
 	 barrier(CLK_GLOBAL_MEM_FENCE);
 
 	 unsigned int offset = x + y * cols;
+	 //if(offset<0 || offset>cols*rows){ printf("\n(offset<0 || offset>cols*rows)##"); return; }
 
 	 float pu, pd, pl, pr;                         // rho, photometric difference: up, down, left, right, of grayscale ref image.
 	 float g0x, g0y, g0, g1;
@@ -135,6 +157,7 @@ __kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kern
 	 g1 = sqrt(g0);
 	 g1 = exp(-3.5 * g1);
 
+	 //if(global_id%10000==0) printf("\nglobal_id=%i, offset=%i, local_id=%i",global_id, offset, local_id);
 	 g1p[offset] = g1;                             // save g1 for this pixel.
  }
 
@@ -142,6 +165,7 @@ __kernel void BuildCostVolume(__global float* p, //0  /////////// aka "cost_kern
  __kernel void CacheG2(__global float* g1p, __global float* gxp, __global float* gyp, int cols,int rows)    // called as "cache2_kernel" in RunCL.cpp
  {
 	 int x = get_global_id(0);
+	 if(x> cols*rows){return;}                      // If out of range, don't process.
 	 int y = x / cols;
 	 x = x % cols;
 	 unsigned int offset = x + y * cols; 

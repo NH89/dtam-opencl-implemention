@@ -114,7 +114,6 @@ int main()
 
 	cout << "\n main_chk 4\n" << flush;
 	cout << "calculate cost volume: ================================================" << endl << flush;
-
 	for (int imageNum = 1; imageNum < 10; imageNum++){                              // Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
@@ -123,34 +122,28 @@ int main()
 	cout << "\n main_chk 5\n" << flush;
 	cout << "cacheGValues: =========================================================" << endl;
 	cv.cacheGValues();                                                             // cacheGValues()  elementwise weighting on keframe image gradient
-
+/*
 	cout << "\n main_chk 6\n" << flush;
 	cout << "optimizing: ===========================================================" << endl;
 	bool doneOptimizing;
-
-	do
-	{
+	do {
 		for (int i = 0; i < 10; i++)
 			cv.updateQD();                                                         // Optimize Q, D   (primal-dual)
 		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
 	} while (!doneOptimizing);
-
+*/
 	cout << "\n main_chk 7\n" << flush;
-	cout << "done: " << endl;
-	
 	cv::Mat depthMap;
 	double min = 0, max = 0;
 	cv::Mat depthImg;
 	cv::namedWindow("depthmap", 1);
 
 	cout << "\n main_chk 8\n" << flush;
-
 	cv.GetResult();                                                                // GetResult /////////////////////
     depthMap = cv._a;                                                              // depthMap = cv._a
 
     cout << "\n main_chk 9\n" << flush;
-
-	cv::minMaxIdx(depthMap, &min, &max);
+	cv::minMaxIdx(depthMap, &max, &min);
 	std::cout << "Max: " << max << " Min: " << min << std::endl<<flush;
 	depthMap.convertTo(depthImg, CV_8U, 255 / max, 0);
 	medianBlur(depthImg, depthImg, 3);
