@@ -21,14 +21,14 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 	__global uchar* img,	//2
 	__global float* cdata,	//3
 	__global float* hdata,	//4 'w'
-	int layerStep,			//5
+	int layerStep,			//5 width*height
 	float weight,			//6
 	int cols,				//7
 	__global float* lo, 	//8
 	__global float* hi,		//9
 	__global float* a,		//10
 	__global float* d,		//11
-	int layers)				//12
+	int layers)				//12 layers=32
 {
 	//weight = 0.5;
 	int global_id = get_global_id(0);
@@ -52,7 +52,7 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
 	unsigned int coff_11, coff_01, coff_10, coff_00;
-	uchar3  c;
+	float3  c, c_11, c_10, c_01, c_00;
 	float v1, v2, v3, del, ns;
 
 	for (unsigned int z = 0; z < layers/*1*/; z++)  // for layers of cost vol...
@@ -77,17 +77,17 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 		coff_01 = ny_     * cols + (nx_ -1);
 		coff_00 = (ny_-1) * cols + (nx_ -1);
 
-		if(coff_11 >200000 && coff_11%1001==0)printf("(%i,%i,%i,%i,%i,%i,%i)",global_id,local_id,xf,yf,coff_11,nx,ny);
+		//if(coff_11 >200000 && coff_11%1001==0)printf("(%i,%i,%i,%i,%i,%i,%i)",global_id,local_id,xf,yf,coff_11,nx_,ny_);
 		if (coff_11 > 307200*3) continue; 			// sampled pixel outside of image  TODO check the effect on DTAM's logic of pixels outside the image.
 
-		float3 c_11; 	c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
-		float3 c_10; 	c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
-		float3 c_01; 	c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
-		float3 c_00; 	c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
+		/*float3 c_11;*/ 	c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
+		/*float3 c_10;*/ 	c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
+		/*float3 c_01;*/ 	c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
+		/*float3 c_00;*/ 	c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
 
 		float factor_x = fmod(nx,1);
 		float factor_y = fmod(ny,1);
-		float3 c =  factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // bi-linear interpolation
+		/*float3*/ c =  factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // bi-linear interpolation
 
 		float thresh = weight;						// occlusionThreshold set at 0.05 by default in main().
 
@@ -95,7 +95,7 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 		v2 = fabs(c.y - B.y);
 		v3 = fabs(c.z - B.z);
 		del = v1 + v2 + v3;							// L1 norm between keyframe & new frame pixels.
-		del = fmin(del, thresh)*3.0f / thresh;		// if(del>0.05) del=3.0, else del=del*60  //  60=3/0.05 //  0.0<=del<=3.0
+		//del = fmin(del, thresh)*3.0f / thresh;		// if(del>0.05) del=3.0, else del=del*60  //  60=3/0.05 //  0.0<=del<=3.0
 
 		if (c.x + c.y + c.z != 0)		{ 			// If new image pixel is NOT black, (i.e. null, out of frame)
 			ns = (c0*w + del) / (w + 1);			// c0 = existing value in this costvol elem.
@@ -111,10 +111,10 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 		maxv = fmax(ns, maxv);
 	}
 	lo[global_id] 	= minv;//base[offset_3];// base[offset_3];//.x;  // export the images as accessed by the kernel.
-	a[offset_1] 	= mini;
-	d[offset_1] 	= ns;
-	hi[offset_1] 	= del;//maxv;//img[coff_11*3];  //  export the images as accessed by the kernel.
-}
+	a[offset_1] 	= v1;//mini;
+	d[offset_1] 	= v2;//ns;
+	hi[offset_1] 	= v3;//c_11.x;//v1;//del;//maxv;//img[coff_11*3];  //  export the images as accessed by the kernel.
+}// # currently all c.x = 0, ie all pixels are out of the keyframe, even for the first image
 
 
  __kernel void CacheG1(__global char* base, __global float* g1p, int cols, int rows)                        // called as "cache1_kernel" in RunCL.cpp

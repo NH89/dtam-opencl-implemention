@@ -155,35 +155,53 @@ void RunCL::createFolders(boost::filesystem::path out_path){
 void RunCL::DownloadAndSave(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show ){
 		cout<<"\n\nDownloadAndSave filename = ["<<folder.filename()<<"] folder="<<folder<<", image_size_bytes="<<image_size_bytes<<", size_mat="<<size_mat<<", type_mat="<<size_mat<<"\t"<<flush;
 		cv::Mat temp_mat = cv::Mat::zeros (size_mat, type_mat);//(int rows, int cols, int type)
-		ReadOutput(temp_mat.data, buffer,  image_size_bytes);  // NB contains
+		ReadOutput(temp_mat.data, buffer,  image_size_bytes); 									// NB contains elements of type_mat, (CV_32FC1 for most buffers)
 
-		cv::Scalar sum = cv::sum(temp_mat);
-		//cout<<"DownloadAndSave chk 1 : read output\n"<<flush;
+		cv::Scalar sum = cv::sum(temp_mat);														// NB always returns a 4 element vector.
+
+		//temp_mat = cv::log(temp_mat);
+
+		double minVal=1, maxVal=1;
+		cv::Point minLoc={0,0}, maxLoc{0,0};
+		if (type_mat == CV_32FC1) cv::minMaxLoc(temp_mat, &minVal, &maxVal, &minLoc, &maxLoc);
 
 		stringstream ss;
-		ss << "/" << folder.filename().string() << "_" << count <<"_sum"<<sum<< ".bmp";
+		ss << "/" << folder.filename().string() << "_" << count <<"_sum"<<sum<< "min"<<minVal<<"max"<<maxVal<< ".tiff";//.tiff//.bmp//.pfm//.hdr
 		if(show)cv::imshow(ss.str(), temp_mat);
 		folder += ss.str();
-		cv::imwrite(folder.string(), temp_mat);
+
+		if (type_mat == CV_32FC1) cv::imwrite(folder.string(), (temp_mat*(1/maxVal)) );// NB .tiff values from 0.0 to 1.0
+		else cv::imwrite(folder.string(), temp_mat );
 		//cout<<"DownloadAndSave chk 2 : wrote output to file\n"<<flush;
 }
 
 void RunCL::DownloadAndSaveVolume(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show ){
-	cout<<"\n\nDownloadAndSave filename = ["<<folder.filename()<<"] folder="<<folder<<", image_size_bytes="<<image_size_bytes<<", size_mat="<<size_mat<<", type_mat="<<size_mat<<"\t"<<flush;
+	cout<<"\n\nDownloadAndSaveVolume, costVolLayers="<<costVolLayers<<", filename = ["<<folder.filename().string()<<"]";
+	cout<<"\n folder="<<folder.string()<<",\t image_size_bytes="<<image_size_bytes<<",\t size_mat="<<size_mat<<",\t type_mat="<<size_mat<<"\t"<<flush;
 	cv::Mat temp_mat = cv::Mat::zeros (size_mat, type_mat);//(int rows, int cols, int type)
-	stringstream ss;
 
-	for(int i=0; i<costVolLayers; i++){
+
+	for(int i=0; i<costVolLayers; i++){ // use float i to avoid "<<" being interpreted as bitshift.
+		//std::string layer = {i+48};
+		cout << "\ncostVolLayers="<<costVolLayers<<", i="<<i<<"\t";
 		size_t offset = i * image_size_bytes;
 		ReadOutput(temp_mat.data, buffer,  image_size_bytes, offset);
 
 		cv::Scalar sum = cv::sum(temp_mat);
+		double minVal=1, maxVal=1;
+		cv::Point minLoc={0,0}, maxLoc{0,0};
+		if (type_mat == CV_32FC1) cv::minMaxLoc(temp_mat, &minVal, &maxVal, &minLoc, &maxLoc);
 
-		ss.clear();
-		ss << "/" << folder.filename().string() << "_" << count << "_layer"<<i<<"_sum"<<sum<<".bmp";
+		//ss.clear();
+		boost::filesystem::path new_filepath = folder;
+		stringstream ss;
+		ss << "/"<< folder.filename().string() << "_" << count << "_layer"<< i <<"_sum"<<sum<< "min"<<minVal<<"max"<<maxVal<<".tiff";
 		if(show)cv::imshow(ss.str(), temp_mat);
-		folder += ss.str();
-		cv::imwrite(folder.string(), temp_mat);
+		new_filepath += ss.str();
+
+		cout << "\nnew_filepath.string() = "<<new_filepath.string() <<"\n";
+		if (type_mat == CV_32FC1) cv::imwrite(new_filepath.string(), (temp_mat*(1/maxVal)) );// NB .tiff values from 0.0 to 1.0
+		else cv::imwrite(new_filepath.string(), temp_mat );
 	}
 }
 
@@ -201,7 +219,7 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 	costVolLayers 	= layers;
 	int pixelSize 	= baseImage.channels();
 	baseImage_size 	= baseImage.size();
-	baseImage_type 	= baseImage.type();											//  pixelSize *  sizeof(baseImage.type())
+	baseImage_type 	= baseImage.type();											// pixelSize *  sizeof(baseImage.type())
 	size_t baseImage_size_bytes = baseImage.total() * baseImage.elemSize() ;	// NB must equal width * height * pixelSize,
 
 	cout <<"\ncalcCostVol chk1, baseImage_size_bytes="<< baseImage_size_bytes << ", baseImage.total()=" << baseImage.total() << ", sizeof(float)="<< sizeof(float)<<flush;
@@ -476,10 +494,13 @@ void RunCL::calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cda
 	DownloadAndSave(dmem, (keyFrameCount*1000 + costVolCount), paths.at("dmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
 
 	// Cost & Hit Volume data
-	DownloadAndSaveVolume(cdatabuf, (keyFrameCount*1000 + costVolCount), paths.at("cdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
-	DownloadAndSaveVolume(hdatabuf, (keyFrameCount*1000 + costVolCount), paths.at("hdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
-
+	if (costVolCount == 9){
+		cout<<"\ncostVolCount == 9, Calling DownloadAndSaveVolume";
+		DownloadAndSaveVolume(cdatabuf, (keyFrameCount*1000 + costVolCount), paths.at("cdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
+		DownloadAndSaveVolume(hdatabuf, (keyFrameCount*1000 + costVolCount), paths.at("hdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
+	}
 	clFlush(m_queue);
+	cout <<"\ncostVolCount="<<costVolCount;
 	cout << "\ncalcCostVol chk13_finished\n" << flush;
 
 }// End of RunCL::calcCostVol(...) ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
