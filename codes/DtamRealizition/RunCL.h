@@ -31,7 +31,7 @@ public:
 	cl_program                  m_program;
 
 	//cl_kernel  cost_kernel, min_kernel, optiQ_kernel, optiD_kernel, optiA_kernel;
-	cl_kernel  cost_kernel, cache1_kernel, cache2_kernel, updateQ_kernel, updateD_kernel, updateA_kernel;
+	cl_kernel  cost_kernel, cache1_kernel, cache2_kernel, cache3_kernel, cache4_kernel, initializeAD_kernel, updateQ_kernel, updateD_kernel, updateA_kernel;
 	cl_mem basemem, imgmem, cdatabuf, hdatabuf, pbuf, qxmem, qymem, dmem, amem/*, gdmem, gumem, glmem, grmem*/;
 	cl_mem basegraymem, gxmem, gymem, g1mem, gqxmem, gqymem, lomem, himem;
 	size_t  global_work_size, local_work_size;
@@ -91,12 +91,13 @@ public:
 	//void optiD(float sigma_d,float epsilon,float denom, float theta);
 	//void optiA(float theta,float ds,float lamda,int l,int layerstep);
     */
-	
-	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
- 
-	void updateA(int layers, float lambda, float theta);
-
+	void cacheGValue2(cv::Mat &bgray, float theta);
 	void cacheGValue(cv::Mat &bgray);
+
+	void initializeAD();
+
+	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
+	void updateA(int layers, float lambda, float theta);
 
 	int waitForEventAndRelease(cl_event *event){
 		cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
@@ -166,7 +167,10 @@ public:
 	
 	void allocatemem(float *qx, float *qy, float* gx, float* gy);
 
-	void ReadOutput(float* outmat) {
+	void ReadOutput(uchar* outmat) {  // cvrc.ReadOutput(_a.data, dmem, image_size_bytes );
+		// DownloadAndSave(dmem, (keyFrameCount*1000 + costVolCount), paths.at("dmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ true );
+		ReadOutput(outmat, dmem,  image_size_bytes);
+		/*
 		cl_event readEvt;
 		cl_int status = clEnqueueReadBuffer(m_queue,
 											dmem,
@@ -181,11 +185,12 @@ public:
 		//clFinish(m_queue);
 		//clReleaseEvent(readEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+		*/
 	}
 
 	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size, size_t offset=0) {
 		cl_event readEvt;
-		cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<"\t"<<flush;
+		cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<", offset="<<offset<<"\t"<<flush;
 		cl_int status = clEnqueueReadBuffer(m_queue,
 											buf_mem,
 											CL_FALSE,

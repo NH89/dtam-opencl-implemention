@@ -58,6 +58,10 @@ public:
 		 float initialWeight = .001
 		 );
 
+	void cacheGValues();
+
+	void initializeAD();
+
 	void initOptimization();
     /*
 	//void optimizeQD();
@@ -88,7 +92,6 @@ public:
 		sigma_q = sigma;
 	}
 
-	void cacheGValues();
 
 	void GetResult();
 private:
@@ -99,7 +102,7 @@ private:
 	void checkInputs(const cv::Mat& R, const cv::Mat& T,
 		const cv::Mat& _cameraMatrix);
 	
-	float theta, thetaStart, thetaStep, thetaMin, epsilon, lambda, sigma_d, sigma_q;
+	float old_theta, theta, thetaStart, thetaStep, thetaMin, epsilon, lambda, sigma_d, sigma_q;
 	float alloced,cachedG,dInited;
 	//void cacheGValues();
 };

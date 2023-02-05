@@ -24,15 +24,15 @@ int main()
 	int numImg = 50;
 	char filename[500];
 	//std::string pathDepthDir = "D:\\projects\\";
-	Mat image, R, T;
-	Mat cameraMatrix = (Mat_<double>(3, 3) << 481.20, 0.0, 319.5,  // TODO where do these values come from ? See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
-		0.0, 480.0, 239.5,
-		0.0, 0.0, 1.0);
+	Mat image, R, T;						// TODO where do these values come from ? See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
+	Mat cameraMatrix = (Mat_<double>(3, 3) << 481.20,   0.0,  319.5,
+												0.0,  480.0,  239.5,
+												0.0,    0.0,    1.0);
 
 	cout << "\n main_chk 1\n" << flush;  	// make output folders ////////////////////////////////////////////////////////////
 	std::time_t result = std::time(nullptr);
 	std::string out_dir = std::asctime(std::localtime(&result));
-	out_dir.pop_back(); // req to remove new_line from end of string.
+	out_dir.pop_back(); 															// req to remove new_line from end of string.
 	boost::filesystem::path out_path(boost::filesystem::current_path());
 	out_path= out_path.parent_path();												// move "out_path" up two levels in the directory tree.
 	out_path= out_path.parent_path();
@@ -76,9 +76,10 @@ int main()
 	cout << "\n main_chk 2\n" << flush;
 	for (int i =0; i < 11; i += inc) {												// Load images & data from file into c++ vectors
 		Mat tmp, d, image;
-		int offset = 462;//0;// better location in this dataset for translation for paralax flow.
+		int offset = 462;//380;//0;// better location in this dataset for translation for paralax flow.
 																					// TODO use a control file specifying where to sample the video.
 		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
+				   //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
 	//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
 			65535,
 			i + offset,
@@ -122,7 +123,9 @@ int main()
 	cout << "\n main_chk 5\n" << flush;
 	cout << "cacheGValues: =========================================================" << endl;
 	cv.cacheGValues();                                                             // cacheGValues()  elementwise weighting on keframe image gradient
-/*
+
+	cv.initializeAD();
+
 	cout << "\n main_chk 6\n" << flush;
 	cout << "optimizing: ===========================================================" << endl;
 	bool doneOptimizing;
@@ -131,7 +134,7 @@ int main()
 			cv.updateQD();                                                         // Optimize Q, D   (primal-dual)
 		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
 	} while (!doneOptimizing);
-*/
+
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;
 	double min = 0, max = 0;
@@ -140,7 +143,15 @@ int main()
 
 	cout << "\n main_chk 8\n" << flush;
 	cv.GetResult();                                                                // GetResult /////////////////////
-    depthMap = cv._a;                                                              // depthMap = cv._a
+    depthMap = cv._a;
+
+	double minVal=1, maxVal=1;
+	cv::Point minLoc={0,0}, maxLoc{0,0};
+	cv::minMaxLoc(depthMap, &minVal, &maxVal, &minLoc, &maxLoc);
+	cv::imshow("raw_depthmap_a1", depthMap);
+	cv::imshow("raw_depthmap_a2", (depthMap*(1.0/maxVal)));
+	cv::imshow("raw_depthmap_a3", (depthMap*(256.0/maxVal)));
+
 
     cout << "\n main_chk 9\n" << flush;
 	cv::minMaxIdx(depthMap, &max, &min);

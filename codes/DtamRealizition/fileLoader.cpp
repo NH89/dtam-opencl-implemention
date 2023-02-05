@@ -68,12 +68,14 @@ void loadAhanda(const char * rootpath,
 
     //cout<<"Reading: "<<png[imageNumber].filename().string()<<endl;
     image = imread(png[imageNumber].string());
+
+    cv::GaussianBlur( image, image, Size( 3, 3 ), 0, 0 );       // Gaussian blur to suppress image artefacts, that later affect photometric error.
     //cout << "chk loadAhanda_4\n" << flush;
 
     int r=image.rows;
     int c=image.cols;
     if(depth.size()>0){
-        cout<<"Depth: "<<depth[imageNumber].filename().string()<<endl;
+        cout<<"\nDepth: "<<depth[imageNumber].filename().string()<<"\t";
         d=loadDepthAhanda(depth[imageNumber].string(), r,c,cameraMatrix);
     }
     //cout << "chk loadAhanda_5\n" << flush;

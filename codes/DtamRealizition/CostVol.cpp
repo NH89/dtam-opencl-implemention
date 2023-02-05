@@ -146,6 +146,7 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	epsilon    = .1*off;
 	lambda     = .001 / off;
 	theta      = thetaStart;
+	old_theta  = theta;
 
 	QDruncount = 0;
 	Aruncount  = 0;
@@ -220,13 +221,18 @@ void CostVol::cacheGValues()
 	cout<<"\nbaseImageGray.empty()="<<baseImageGray.empty()<<flush;
 	cout<<"\nbaseImageGray.size="<<baseImageGray.size<<flush;
 
-	cvrc.cacheGValue(baseImageGray);
+	cvrc.cacheGValue2(baseImageGray, theta);
 }
 
+void CostVol::initializeAD()
+{
+	cout<<"\nCostVol::initializeAD()"<<flush;
+	cvrc.initializeAD();
+}
 
 void CostVol::updateQD()
 {
-	cout<<"\nupdateQD_chk0, epsilon="<<epsilon<<" theta="<<theta<<flush;
+	cout<<"\nupdateQD_chk0, epsilon="<<epsilon<<" theta="<<theta<<flush; // but if theta falls below 0.001, then G must be recomputed.
 	computeSigmas(epsilon, theta);
 
 	cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<flush;
@@ -238,6 +244,8 @@ void CostVol::updateQD()
 
 bool CostVol::updateA()
 {
+	if (theta < 0.001 && old_theta > 0.001){cacheGValues(); old_theta=theta;}
+
 	cout<<"\nupdateA_chk0, "<<flush;
 	bool doneOptimizing = theta <= thetaMin;
 
@@ -254,7 +262,12 @@ bool CostVol::updateA()
 void CostVol::GetResult()
 {
 	cout<<"\nCostVol::GetResult_chk0"<<flush;
-	cvrc.ReadOutput((float*)_a.data);
+	cvrc.ReadOutput(_a.data); // (float*)
+
+	// DownloadAndSave(dmem,	  (count ), paths.at("dmem"), 	  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
+	// void RunCL::DownloadAndSave(cl_mem buffer,  int count,  boost::filesystem::path folder,  size_t image_size_bytes,  cv::Size size_mat,  int type_mat,  bool show )
+	// ReadOutput(temp_mat.data, buffer,  image_size_bytes);
+	// cvrc.ReadOutput(_a.data, dmem, image_size_bytes );
 
 	cout<<"\nCostVol::GetResult_chk1"<<flush;
 	cvrc.CleanUp();
