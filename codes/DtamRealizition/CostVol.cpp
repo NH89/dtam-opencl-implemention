@@ -140,11 +140,11 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	cout << "CostVol_chk 5\n" << flush;
     count      = 0;
 	float off  = layers / 32;
-	thetaStart = 200.0*off;
-	thetaMin   = 1.0*off;
+	thetaStart = 0.2;		//200.0*off;					// Why ? DTAM_Mapping has Theta_start = 0.2
+	thetaMin   = 1.0e-4;	//1.0*off;
 	thetaStep  = .97;
-	epsilon    = .1*off;
-	lambda     = .001 / off;
+	epsilon    = 1.0e-4;	//.1*off;
+	lambda     = 1.0;		//.001 / off;
 	theta      = thetaStart;
 	old_theta  = theta;
 
@@ -235,7 +235,7 @@ void CostVol::updateQD()
 	cout<<"\nupdateQD_chk0, epsilon="<<epsilon<<" theta="<<theta<<flush; // but if theta falls below 0.001, then G must be recomputed.
 	computeSigmas(epsilon, theta);
 
-	cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<flush;
+	cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
 	cvrc.updateQD(epsilon, theta, sigma_q, sigma_d);
 
 	cout<<"\nupdateQD_chk3, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
@@ -246,13 +246,13 @@ bool CostVol::updateA()
 {
 	if (theta < 0.001 && old_theta > 0.001){cacheGValues(); old_theta=theta;}
 
-	cout<<"\nupdateA_chk0, "<<flush;
+	cout<<"\nCostVol::updateA_chk0, "<<flush;
 	bool doneOptimizing = theta <= thetaMin;
 
-	cout<<"\nupdateA_chk1, "<<flush;
+	cout<<"\nCostVol::updateA_chk1, "<<flush;
 	cvrc.updateA(layers,lambda,theta);
 	
-	cout<<"\nupdateA_chk2, "<<flush;
+	cout<<"\nCostVol::updateA_chk2, "<<flush;
 	theta *= thetaStep;
 
 	return doneOptimizing;

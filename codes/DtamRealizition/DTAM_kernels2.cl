@@ -89,16 +89,16 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 
 		float thresh = weight;						// occlusionThreshold set at 0.05 by default in main().
 
-		v1 = fabs(c.x - B.x);						// rgb photometric cost: bi-linear. ? should read the keyframe B as a float ?
+		v1 = fabs(c.x - B.x);						// rgb photometric cost: bi-linear.
 		v2 = fabs(c.y - B.y);
-		v3 = fabs(c.z - B.z);
+		v3 = fabs(c.z - B.z);																// TODO is applying norm here premature ? Does it degrade naive depthmap ?
 		del = v1 + v2 + v3;							// L1 norm between keyframe & new frame pixels.
-		del = fmin(del/10000, thresh)*3.0f / thresh;		// if(del>0.05) del=3.0, else del=del*60  //  60=3/0.05 //  0.0<=del<=3.0
+		//del = fmin(del/10000, thresh)*3.0f / thresh;		// if(del>0.05) del=3.0, else del=del*60  //  60=3/0.05 //  0.0<=del<=3.0
 													// NB divide del by 256 to move from char to float value range.
 		if (c.x + c.y + c.z != 0)		{ 			// If new image pixel is NOT black, (i.e. null, out of frame)
 			ns = (c0*w + del) / (w + 1);			// c0 = existing value in this costvol elem.
 			cdata[offset_1 + z*layerStep] = ns;		// Costdata, same location c0 was read from.  // CostVol set here ###########
-			hdata[offset_1 + z*layerStep] = w + 1;	// Weightdata, same location w  was read from.
+			hdata[offset_1 + z*layerStep] = w + 1;	// Weightdata, same location w  was read from. Counts how many times this ray
 		}else{
 			ns = c0;
 		}
@@ -108,7 +108,9 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 		}
 		maxv = fmax(ns, maxv);
 	}
-	// NB All of these are for logging intermediate data for diagnostics, not later use.
+	// NB All of these are for logging intermediate data for diagnostics.
+	// a[offset_1] = mini; records the naive depthmap.
+	// d[offset_1] = ns;  records cost at the naive depthmap
 	lo[global_id] 	= minv;//base[offset_3];// base[offset_3];//.x;  // export the images as accessed by the kernel.
 	a[offset_1] 	= mini;//v1;//
 	d[offset_1] 	= ns;//v2;//
@@ -277,24 +279,40 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 
 	 barrier(CLK_GLOBAL_MEM_FENCE);
 	 unsigned int offset = x + y * cols;
-	 /*float grad*/ g1p[offset] = 	3*gxp[offset] + gxp[offset + upoff] + gxp[offset + dnoff]  /
-									+ 3*gyp[offset] + gyp[offset + rtoff] + gyp[offset + lfoff] ; // sobel edge, from grad_xy
+	 //float grad = 	3*gxp[offset] + gxp[offset + upoff] + gxp[offset + dnoff]  /
+	 //								+ 3*gyp[offset] + gyp[offset + rtoff] + gyp[offset + lfoff] ; // sobel edge, from grad_xy
 
 	 //float alpha = -1; 								// in DTAM<1000lines
 	 //g1p[offset] = exp(alpha * ((grad > beta)*(grad*grad/(2*beta)) + (grad <= beta)*(fabs(grad) - beta/2)));	// Exp of Huber norm on sobel edges
+	 ///////////////////////
+	 // Adapted from DTAM_Mapping
+	 // DTAM paper Equation(5), $g(\mathbf{u}) = e^{-\alpha\|\nabla \mathbf{I_r(u)}\|_2^{\beta}}$
+	 float alphaG = 1.0;
+	 float betaG = 1.0;
+	 // g[i] = expf( -alphaG * powf(sqrtf(gx*gx + gy*gy), betaG) );
+	 // alphaG * pow(sqrt(gxp[offset]*gxp[offset] + gyp[offset]*gyp[offset]), betaG) ; // exp(   )
+	 float gx=gxp[offset];
+	 float gy=gyp[offset];
+	 //if ( isnan(gx) || isnan(gy) || gx<0 || gy<0) {g1p[offset] = 240;} // gx > 512.0 || gy > 512.0 ||
+	 //else	{g1p[offset] = gxp[offset];}//*gxp[offset] + gyp[offset]*gyp[offset] ;}
+	 g1p[offset] = exp(-alphaG * pow(sqrt(gx*gx + gy*gy), betaG) );
+
+	 // float32 powf(x,y) = x^y, betaG = 1.1(fountain.json), 1.5(fountain_p5.json), 1(icl & TUM)
+	 // float32 expf(x) = e^x,  alphaG = 0.025(fountain.json), 0.065(fountain_p5.json), 0.4(icl), 0.015(TUM)
+
  }
 
 
 
  
- __kernel void UpdateQ(
-	 __global float* gxpt,                                                                // called as "updateQ_kernel" in RunCL.cpp
-	 __global float* gypt,                         // gxpt, gypt : G for this keyframe 
-	 __global float* gqxpt,
-	 __global float* gqypt,                        // gqxpt, gqypt : Q ?
-	 __global float* dpt,                          // depth D ?
-	 float epsilon,
-	 float sigma_q,
+ __kernel void UpdateQ(												// called as "updateQ_kernel" in RunCL.cpp // TODO needs to use g1mem
+	 __global float* gxpt,                          // gxmem
+	 __global float* gypt,                          // gymem     gxpt, gypt : G for this keyframe
+	 __global float* gqxpt,							// gqxmem    NB default initialization :=1.0
+	 __global float* gqypt,                         // gqymem    gqxpt, gqypt : Q ?
+	 __global float* dpt,                           // dmem,     depth D
+	 float epsilon,									// epsilon = 0.1
+	 float sigma_q,									// sigma_q = 0.0559017
 	 int cols,
 	 int rows)
  {
@@ -310,10 +328,10 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 	 float dh = dpt[pt];                           // depth 'here'
 	 float gqx, gqy, dr, dd, qx, qy, gx, gy;       // GQx,y, D_right, D_down, Q, G ?
 
-	 gqx = gqxpt[pt];                                              // Update gq_x_pt
+	 gqx = gqxpt[pt];                              // Update gq_x_pt // Buffer initialized to 1.0 by default when created.
 	 gx = gxpt[pt] + .005f;
 	 dr = dpt[pt + rtoff];
-	 qx = gqx / gx;
+	 qx = gqx / gx;								   // Initially 1/gx
 	 qx = (qx + sigma_q*gx*(dr - dh)) / (1 + sigma_q*epsilon);     // (dr - dh) = gradient of depth map
 	 qx = qx / fmax(1.0f, fabs(qx));                               // Pi_q(x) function from step 1 in DTAM paper.
 	 gqx = gx *  qx;
@@ -330,12 +348,13 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
  }
 
  
- __kernel void UpdateD(__global float* gqxpt,                                                               // called as "updateD_kernel" in RunCL.cpp 
-	 __global float* gqypt,
-	 __global float* dpt,
-	 __global float* apt,
-	 float theta,
-	 float sigma_d,
+ __kernel void UpdateD(												// called as "updateD_kernel" in RunCL.cpp
+	 __global float* gqxpt,							// gqxmem
+	 __global float* gqypt,							// gqymem
+	 __global float* dpt,							// dmem
+	 __global float* apt,							// amem
+	 float theta,									// theta = 200			NB in fountain,icl,tum: theta_start=0.2, thetaMin = 1.0e-4
+	 float sigma_d,									// sigma_d = 1.11803
 	 int cols)
  {
 	 int x = get_global_id(0);

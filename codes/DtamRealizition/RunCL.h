@@ -32,7 +32,7 @@ public:
 
 	//cl_kernel  cost_kernel, min_kernel, optiQ_kernel, optiD_kernel, optiA_kernel;
 	cl_kernel  cost_kernel, cache1_kernel, cache2_kernel, cache3_kernel, cache4_kernel, initializeAD_kernel, updateQ_kernel, updateD_kernel, updateA_kernel;
-	cl_mem basemem, imgmem, cdatabuf, hdatabuf, pbuf, qxmem, qymem, dmem, amem/*, gdmem, gumem, glmem, grmem*/;
+	cl_mem basemem, imgmem, cdatabuf, hdatabuf, pbuf, dmem, amem; /*, gdmem, gumem, glmem, grmem, qxmem, qymem,*/
 	cl_mem basegraymem, gxmem, gymem, g1mem, gqxmem, gqymem, lomem, himem;
 	size_t  global_work_size, local_work_size;
 	bool gpu;
@@ -79,10 +79,10 @@ public:
 		return 1;
 	}
 
-	void DownloadAndSave(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show);
+	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show);
 	//void DownloadAndSave(cl_mem buffer, boost::filesystem::path folder, size_t size);
 
-	void DownloadAndSaveVolume(cl_mem buffer, int count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
+	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
 
 	void calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
     /*	
@@ -169,7 +169,7 @@ public:
 
 	void ReadOutput(uchar* outmat) {  // cvrc.ReadOutput(_a.data, dmem, image_size_bytes );
 		// DownloadAndSave(dmem, (keyFrameCount*1000 + costVolCount), paths.at("dmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ true );
-		ReadOutput(outmat, dmem,  image_size_bytes);
+		ReadOutput(outmat, dmem,  (width * height * sizeof(float)) );  // image_size_bytes
 		/*
 		cl_event readEvt;
 		cl_int status = clEnqueueReadBuffer(m_queue,
@@ -201,6 +201,7 @@ public:
 											NULL,
 											&readEvt);
 		clFlush(m_queue);
+		//clWaitForEvents (1, &readEvt);
 		clFinish(m_queue);
 		//clReleaseEvent(readEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\t"<<flush; exit_(status);}

@@ -124,7 +124,7 @@ int main()
 	cout << "cacheGValues: =========================================================" << endl;
 	cv.cacheGValues();                                                             // cacheGValues()  elementwise weighting on keframe image gradient
 
-	cv.initializeAD();
+//	cv.initializeAD();
 
 	cout << "\n main_chk 6\n" << flush;
 	cout << "optimizing: ===========================================================" << endl;
@@ -133,13 +133,13 @@ int main()
 		for (int i = 0; i < 10; i++)
 			cv.updateQD();                                                         // Optimize Q, D   (primal-dual)
 		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
+		doneOptimizing = true; // debug single loop TODO remove this line.
 	} while (!doneOptimizing);
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;
 	double min = 0, max = 0;
 	cv::Mat depthImg;
-	cv::namedWindow("depthmap", 1);
 
 	cout << "\n main_chk 8\n" << flush;
 	cv.GetResult();                                                                // GetResult /////////////////////
@@ -148,22 +148,14 @@ int main()
 	double minVal=1, maxVal=1;
 	cv::Point minLoc={0,0}, maxLoc{0,0};
 	cv::minMaxLoc(depthMap, &minVal, &maxVal, &minLoc, &maxLoc);
-	cv::imshow("raw_depthmap_a1", depthMap);
-	cv::imshow("raw_depthmap_a2", (depthMap*(1.0/maxVal)));
-	cv::imshow("raw_depthmap_a3", (depthMap*(256.0/maxVal)));
 
-
-    cout << "\n main_chk 9\n" << flush;
-	cv::minMaxIdx(depthMap, &max, &min);
-	std::cout << "Max: " << max << " Min: " << min << std::endl<<flush;
-	depthMap.convertTo(depthImg, CV_8U, 255 / max, 0);
-	medianBlur(depthImg, depthImg, 3);
-
-	cout << "\n main_chk 10\n" << flush;
-	cv::imshow("depthmap", depthImg);                                             //cv::imshow("depthmap", depthImg);
+	std::stringstream ss;
+	ss << "Depthmap, maxVal: " << maxVal << " minVal: " << minVal << " minLoc: "<< minLoc <<" maxLoc: " << maxLoc;
+	cv::imshow(ss.str(), (depthMap*(1.0/maxVal)));
+	std::cout << ss.str() << std::endl<<flush;
 	cv::waitKey(-1);
 
-	cout << "\n main_chk 11\n" << flush;
+	cout << "\n main_chk 9 : finished\n" << flush;
 	return 0;
 }
 
