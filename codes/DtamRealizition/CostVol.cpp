@@ -224,11 +224,13 @@ void CostVol::cacheGValues()
 	cvrc.cacheGValue2(baseImageGray, theta);
 }
 
+/*
 void CostVol::initializeAD()
 {
 	cout<<"\nCostVol::initializeAD()"<<flush;
 	cvrc.initializeAD();
 }
+*/
 
 void CostVol::updateQD()
 {

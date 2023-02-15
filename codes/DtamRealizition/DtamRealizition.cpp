@@ -78,7 +78,8 @@ int main()
 		Mat tmp, d, image;
 		int offset = 462;//380;//0;// better location in this dataset for translation for paralax flow.
 																					// TODO use a control file specifying where to sample the video.
-		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
+		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
+					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
 				   //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
 	//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
 			65535,
@@ -156,6 +157,7 @@ int main()
 	cv::waitKey(-1);
 
 	cout << "\n main_chk 9 : finished\n" << flush;
-	return 0;
+	//return 0;
+	exit(0);
 }
 

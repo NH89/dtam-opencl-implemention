@@ -197,7 +197,7 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 	 //intemp = ((int)fptemp) | positive_zero_int;
 	 *fpnum = (float)(((int)*fpnum) | positive_zero_int);		// by ISO C-11 standard, sign-bit=1, followed 8 expoment bits, then 23 mantissa bits.
 
-	 //*fpnum | (float)0.0; // does this work ?
+	 //  *fpnum | (float)0.0; // does this work ?
  }
 */
 
@@ -226,12 +226,19 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 	 pd =  base[offset + dnoff];// + base[offset + 2*dnoff];
 
 	 float g;
+	 float alphaG = 0.4;  // from icl_nuim.json, // 0.4 to 0.015
+	 float betaG = 1.0;		// 1 to 1.5
+
 	 g = fabs(pr - pl); // ## TODO why is "if(g>64)" needed ? & why this value ? better solutions ?
 	 /*if (g>64) gxp[offset] = 0.0; else*/
-	 gxp[offset] = g;	//g0x          // abs value of vert & horiz gradients.
+	 gxp[offset] = g;// exp(-alphaG * pow(g, betaG) ); //g;	//g0x          // abs value of vert & horiz gradients.
+
 	 g = fabs(pd - pu);
 	 /*if (g>64) gyp[offset] = 0.0; else*/
-	 gyp[offset] = g;	//g0y
+	 gyp[offset] = g;// exp(-alphaG * pow(g, betaG) ); //g;	//g0y
+
+	 // exp(-alphaG * pow(sqrt(gx*gx + gy*gy), betaG) );
+
 	 /*
 	 // Huber norm of image gradient, in eq (5).
 	 float alpha = -1; 													// in DTAM<1000lines
@@ -302,9 +309,100 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 
  }
 
+ __kernel void UpdateQD(
+	 __global float* g1pt,
+	 __global float* qpt,
+	 __global float* dpt,                           // dmem,     depth D
+	 __global float* apt,                           // amem,     auxilliary A
+	 float epsilon,									// epsilon = 0.1
+	 float sigma_q,									// sigma_q = 0.0559017
+	 float sigma_d,
+	 float theta,
+	 int cols,
+	 int rows)
+ {
+	 int x = get_global_id(0);
+	 int y = x / cols;
+	 x = x % cols;
+	 unsigned int pt = x + y * cols;               // index of this pixel
+	 barrier(CLK_GLOBAL_MEM_FENCE);
 
+	 float g1 = g1pt[pt];
+	 float q  = qpt[pt];
+	 float d  = dpt[pt];
+	 float a  = apt[pt];
 
- 
+	 float val 		= (q + sigma_q * g1 * d)/(1 + sigma_q + epsilon);
+	 float q_next 	= val/fmax((float)1.0,(float)fabs(val));
+	 float d_next 	= (d + sigma_d*((g1*q_next) + (a/theta)))/(1 + (sigma_d/theta));
+
+	 qpt[pt] = q_next;
+	 dpt[pt] = d_next;
+ }
+
+ /*
+ float E_aux(float a_, float d, float lambda, float theta, unsigned int pt, int layer_step, __global float* cdata)
+ {
+	 return ((d-a_)*(d-a_)/(2*theta)) + lambda*cdata[pt + layer_step*(int)a_];	// Eq 14 from DTAM paper.
+ }
+*/
+
+ __kernel void UpdateA2(  // pointwise exhaustive search
+	__global float* cdata,                         //           cost volume
+	__global float* apt,                           // dmem,     depth D
+	__global float* dpt,                           // amem,     auxilliary A
+	int layers,
+	int cols,
+	int rows,
+	float lambda,
+	float theta)
+ {
+	 int x = get_global_id(0);
+	 int y = x / cols;
+	 x = x % cols;
+	 unsigned int pt  = x + y * cols;               // index of this pixel
+	 if (pt >= (cols*rows))return;
+	 unsigned int cpt = pt;
+	 unsigned int layer_step = rows*cols;
+	 barrier(CLK_GLOBAL_MEM_FENCE);
+
+	 float d  	= dpt[pt];
+	 float a  	= apt[pt];
+	 float E_a  = FLT_MAX;
+
+	 float min_val     = FLT_MAX;
+	 int   min_layer   = 0;
+
+	 for (int layer=1; layer<(layers-1); layer++, cpt+=layer_step){
+		 E_a = ((d-a)*(d-a)/(2*theta)) + lambda*cdata[cpt];  								// Eq 14 from DTAM paper.
+		 if (E_a<min_val){
+			 min_val   = E_a;
+			 min_layer = layer;
+		 }
+	 }
+	 a = min_layer;
+
+	 // Eq 18 from DTAM paper, subsample refinement. Consider gradient & curvature wrt adjacent depth levels.
+	 // (Otherwise use minimum of parabola through adjacent depth samples of the cost volume.)
+
+	 if(a<2 || a>=(layers-2)) return;
+	 float E1 = ((d-a-1)*(d-a-1)/(2*theta)) + lambda*cdata[pt + layer_step*((int)a-1)]; 	// NB 'a' must be > 0
+	 float E2 = ((d-a  )*(d-a  )/(2*theta)) + lambda*cdata[pt + layer_step*((int)a)];
+	 float E3 = ((d-a+1)*(d-a+1)/(2*theta)) + lambda*cdata[pt + layer_step*((int)a+1)]; 	// NB 'a' must be < layers
+
+	 float grad_E = (E1-E3);				// /2
+	 float div_E  = (E1 -2*E2 + E3);		// /4
+
+	 // && (a - 2*grad_E/div_E)!=nan
+
+	 if (div_E != 0 ){
+		apt[pt] = a - 2*grad_E/div_E ; // TODO problem getting -ve values !
+	 }else {
+		apt[pt] = a;
+	}
+ }
+
+/*
  __kernel void UpdateQ(												// called as "updateQ_kernel" in RunCL.cpp // TODO needs to use g1mem
 	 __global float* gxpt,                          // gxmem
 	 __global float* gypt,                          // gymem     gxpt, gypt : G for this keyframe
@@ -346,8 +444,9 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 	 gqy = gy *  qy;
 	 gqypt[pt] = gqy;
  }
+*/
 
- 
+/*
  __kernel void UpdateD(												// called as "updateD_kernel" in RunCL.cpp
 	 __global float* gqxpt,							// gqxmem
 	 __global float* gqypt,							// gqymem
@@ -386,7 +485,7 @@ __kernel void BuildCostVolume(						// called as "cost_kernel" in RunCL.cpp
 
 	 dpt[pt] = d;
  }
-
+*/
  
  float afunc(float data, float theta, float d, float ds, int a, float lambda)                               // used in __kernel void UpdateA(...) below
  {
