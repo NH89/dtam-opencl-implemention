@@ -22,7 +22,7 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 	//0  fy cy 
 	//0  0  1  
     
-	projection.create(4, 4, CV_64FC1);
+	projection.create(4, 4, CV_64FC1);											// NB cv::Mat projection; declared in CostVol.h
 	projection = 0.0;
 	projection(Range(0, 2), Range(0, 3)) += cameraMatrix.rowRange(0, 2);
 	//Projection:
@@ -183,6 +183,7 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 	assert(lo.isContinuous() );
 	assert(hi.isContinuous() );
     
+	// persp matrix //////////
 	cout << "\nupdateCost chk5," << flush;
 	double *p = (double*)imFromCV.data;
 	float persp[12];
@@ -198,9 +199,38 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 	//float* hitd = (float*)malloc(st);
 	//memcpy(hitd, (float*)hit.data, st);
 	*/
+
+	// camera_params //////
+	float camera_params[3];
+	//int mat_type = cameraMatrix.type();
+	camera_params[0] = cameraMatrix.at<double>(0,0)  ; // focal length, assumes fx=fy
+	camera_params[1] = cameraMatrix.at<double>(0,2)  ; // c_x
+	camera_params[2] = cameraMatrix.at<double>(1,2)  ; // c_y
+	cout<<"\n";
+	cout<<"\nfx=camera_params[0]="<<camera_params[0];
+	cout<<"\ncx=camera_params[1]="<<camera_params[1];
+	cout<<"\ncy=camera_params[2]="<<camera_params[2];
+	cout<<"\n"<<flush;
+
+	// rt_mtx ///////  R & T  TODO fix this !
+	Mat rt_mtx;
+	hconcat(R, T, rt_mtx);
+	//for (int i = 0; i<12; i++) {	// Load the pose transform matrix as ana array of 12 doubles.
+    //    persp[i] = p[i]; 			// Implicit conversion double->float.
+    //}
+
+
+	cout<<"\nrt_mtx="<<"\n";
+	for (int i=0; i<3; i++){
+		for (int j=0; j<4; j++){
+			cout<<rt_mtx.at<float>(i,j)<<",";
+		}cout<<"\n";
+	}cout<<"\n"<<flush;
+
+
 	cout << "\nupdateCost chk6," << flush;
                                                                         // calls calcCostVol(..) ###############################
-	cvrc.calcCostVol(persp, baseImage, image, (float*)costdata.data, (float*)hit.data, occlusionThreshold, layers);
+	cvrc.calcCostVol(/*persp*/ camera_params, (float*)rt_mtx.data, baseImage, image, (float*)costdata.data, (float*)hit.data, occlusionThreshold, layers);
 	cout << "\nupdateCost chk7_finished\n" << flush;
 	/*
     //memcpy(hit.data, hitd, st);

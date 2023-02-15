@@ -55,10 +55,7 @@ static void LieToRT(InputArray Lie, OutputArray _R, OutputArray _T){
         
     rodrigues(p.colRange(Range(0,3))).copyTo(R);
     Mat(p.colRange(Range(3,6)).t()).copyTo(T);
-
-
 }
-
 
 static void RTToLie(InputArray _R, InputArray _T, OutputArray Lie ){
 

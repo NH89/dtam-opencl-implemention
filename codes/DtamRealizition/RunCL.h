@@ -31,7 +31,7 @@ public:
 	//cl_kernel  cost_kernel, min_kernel, optiQ_kernel, optiD_kernel, optiA_kernel;
 	cl_kernel cost_kernel, cache3_kernel, cache4_kernel, updateQD_kernel, updateA_kernel;
 	// cache1_kernel, cache2_kernel, updateQ_kernel, updateD_kernel, initializeAD_kernel,
-	cl_mem basemem, imgmem, cdatabuf, hdatabuf, pbuf, dmem, amem; // gdmem, gumem, glmem, grmem, qxmem, qymem,
+	cl_mem basemem, imgmem, cdatabuf, hdatabuf, kbuf, rtbuf, dmem, amem; // gdmem, gumem, glmem, grmem, qxmem, qymem, pbuf,
 	cl_mem basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem;  // gqxmem, gqymem,
 	size_t  global_work_size, local_work_size;
 	bool gpu;
@@ -80,7 +80,7 @@ public:
 
 	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show);
 	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
-	void calcCostVol(float* p, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
+	void calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
 	void cacheGValue2(cv::Mat &bgray, float theta);
 	//void initializeAD();
 	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
