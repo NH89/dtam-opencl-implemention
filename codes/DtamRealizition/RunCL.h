@@ -161,8 +161,10 @@ public:
 
 	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size, size_t offset=0) {
 		cl_event readEvt;
+		cl_int status;
 		cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<", offset="<<offset<<"\t"<<flush;
-		cl_int status = clEnqueueReadBuffer(m_queue,
+		status = clFinish(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="		<<status<<" "<<checkerror(status)  <<"\n"<<flush; exit_(status);}
+		status = clEnqueueReadBuffer(m_queue,
 											buf_mem,
 											CL_FALSE,
 											offset,
@@ -173,6 +175,7 @@ public:
 											&readEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\t"<<flush; exit_(status);}
 		status = clFlush(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = "<<status<<" "<< checkerror(status) <<"\n"<<flush; exit_(status);}
+		status = clWaitForEvents(1, &readEvt); if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status=" << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
 		status = clFinish(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="		<<status<<" "<<checkerror(status)  <<"\n"<<flush; exit_(status);}
 	}
 

@@ -1,87 +1,49 @@
-// loads all files of a given name and extension
-//#include "stdafx.h"     // windows precompiled header file
 #include <iostream>
 #include <set>
 #include <string>
 #include "fileLoader.hpp"
 #include <boost/filesystem.hpp>
 #include <fstream>
-//#include <comdef.h>	    // part of MS Platform SDK
 
-    using namespace cv;
-    using namespace std;
-    namespace fs = ::boost::filesystem;
-    static fs::path root;
+using namespace cv;
+using namespace std;
+namespace fs = ::boost::filesystem;
+static fs::path root;
 static vector<fs::path> txt;
 static vector<fs::path> png;
 static vector<fs::path> depth;
 
-
 void get_all(const fs::path& root, const string& ext, vector<fs::path>& ret)
-/*{
-	if (!fs::exists(root) || !fs::is_directory(root))
-		return;
-	fs::recursive_directory_iterator it(root);
-	fs::recursive_directory_iterator endit;
 
-	while (it!=endit)
-	{
-		if (fs::is_regular_file(*it) && it->path().extension() == ext)
-			ret.push_back(it->path().filename());
-		++it;
-	}
-}*/;
 void loadAhanda(const char * rootpath,
                 double range,
                 int imageNumber,
                 Mat& image,
                 Mat& d,
-
                 Mat& cameraMatrix,
                 Mat& R,
                 Mat& T){
     if(root!=string(rootpath)){
-
         root=string(rootpath);
         get_all(root, ".txt", txt);                            // gathers all filepaths with each suffix, into c++ vectors.
         get_all(root, ".png", png);
         get_all(root, ".depth", depth);
                 cout<<"Loading......"<<endl;
     }
-    //cout << "chk loadAhanda_1\n" << flush;
-    //cout << "imageNumber = " << imageNumber << "\n" << flush;
-
-    std::string str = txt[imageNumber].c_str();
-    //cout << "chk loadAhanda_1.1\n" << flush;
-
-    char * ch = new char [str.length()+1];
-    //cout << "chk loadAhanda_1.2\n" << flush;
-
+    std::string str = txt[imageNumber].c_str();                // grab .txt filename from array (e.g. "scene_00_0000.txt")
+    char        *ch = new char [str.length()+1];
     std::strcpy (ch, str.c_str());
-    //cout << "chk loadAhanda_2\n" << flush;
-
-	//const wchar_t* w = txt[imageNumber].c_str();
-	//_bstr_t b(w);                                              // a MS comdef.h class. Basic string or binary string
-	//const char* ch = b;
-    convertAhandaPovRayToStandard(ch,R,T);
-    //cout << "chk loadAhanda_3\n" << flush;
-
-    //cout<<"Reading: "<<png[imageNumber].filename().string()<<endl;
-    image = imread(png[imageNumber].string());
-
-    cv::GaussianBlur( image, image, Size( 3, 3 ), 0, 0 );       // Gaussian blur to suppress image artefacts, that later affect photometric error.
-    //cout << "chk loadAhanda_4\n" << flush;
-
-    int r=image.rows;
-    int c=image.cols;
+    convertAhandaPovRayToStandard(ch,R,T);                     // read "*.txt" & extract R&T //////
+    image = imread(png[imageNumber].string());                 // Read image
+    image.convertTo(image, CV_32F);                            // convert 8-bit uchar -> 32-bit float
+    cv::GaussianBlur(image, image, Size(3,3), 0, 0 );          // Gaussian blur to suppress image artefacts, that later affect photometric error.
+    int r = image.rows;
+    int c = image.cols;
     if(depth.size()>0){
-        cout<<"\nDepth: "<<depth[imageNumber].filename().string()<<"\t";
-        d=loadDepthAhanda(depth[imageNumber].string(), r,c,cameraMatrix);
+        cout<<"\nDepth: " <<depth[imageNumber].filename().string()<<"\t";
+        d = loadDepthAhanda(depth[imageNumber].string(), r,c,cameraMatrix);
     }
-    //cout << "chk loadAhanda_5\n" << flush;
-
 }
-
 
 Mat loadDepthAhanda(string filename, int r,int c,Mat cameraMatrix){
     ifstream in(filename.c_str());
@@ -106,27 +68,17 @@ Mat loadDepthAhanda(string filename, int r,int c,Mat cameraMatrix){
             *p=*p/sqrt(x*x+y*y+1);
         }
     }
-    
-    
-    
     return out;
 }
 
-
-
-
 #define BOOST_FILESYSTEM_VERSION 3
 #define BOOST_FILESYSTEM_NO_DEPRECATED 
-
-
 // return the filenames of all files that have the specified extension
 // in the specified directory and all subdirectories
 void get_all(const fs::path& root, const string& ext, vector<fs::path>& ret)
 {  
-  if (!fs::exists(root)) return;
-
-  if (fs::is_directory(root))
-  {
+  if (!fs::exists(root))        return;
+  if (fs::is_directory(root))   {
     typedef std::set<boost::filesystem::path> Files;
     Files files;
     fs::recursive_directory_iterator it0(root);

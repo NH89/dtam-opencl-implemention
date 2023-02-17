@@ -19,27 +19,23 @@ using namespace std;
 int main()
 {
 	cout << "\n main_chk 0\n" << flush;
-
-	//initialize opencl
 	int numImg = 50;
 	char filename[500];
-	//std::string pathDepthDir = "D:\\projects\\";
 	Mat image, R, T;						// TODO where do these values come from ? See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
 	Mat cameraMatrix = (Mat_<double>(3, 3) << 481.20,   0.0,  319.5,
 												0.0,  480.0,  239.5,
 												0.0,    0.0,    1.0);
 
 	cout << "\n main_chk 1\n" << flush;  	// make output folders ////////////////////////////////////////////////////////////
-	std::time_t result = std::time(nullptr);
-	std::string out_dir = std::asctime(std::localtime(&result));
+	std::time_t   result  = std::time(nullptr);
+	std::string   out_dir = std::asctime(std::localtime(&result));
 	out_dir.pop_back(); 															// req to remove new_line from end of string.
 	boost::filesystem::path out_path(boost::filesystem::current_path());
-	out_path= out_path.parent_path();												// move "out_path" up two levels in the directory tree.
-	out_path= out_path.parent_path();
+	out_path = out_path.parent_path();												// move "out_path" up two levels in the directory tree.
+	out_path = out_path.parent_path();
 	out_path += "/output/";// + out_dir;
 
-	if(boost::filesystem::create_directory(out_path)) {
-		std::cerr<< "Directory Created: "<<out_path<<std::endl;
+	if(boost::filesystem::create_directory(out_path)) { std::cerr<< "Directory Created: "<<out_path<<std::endl;
 	}else{ std::cerr<< "Directory previously created: "<<out_path<<std::endl;
 	}
 	out_path +=  out_dir;
@@ -47,27 +43,6 @@ int main()
 	boost::filesystem::create_directory(out_path);//, ec);
 	out_path += "/";
 
-/*
-	/////////////   move the rest to a fn in RunCL.///////
-	boost::filesystem::path temp_path = out_path;
-																					// Vector of device buffer names
-	std::vector<std::string> names = {"basemem","imgmem","cdatabuf","hdatabuf","pbuf","qxmem","qymem","dmem", "amem","basegraymem","gxmem","gymem","g1mem","gqxmem","gqymem","lomem","himem"};
-
-	std::pair<std::string, boost::filesystem::path> tempPair;
-	std::map <std::string, boost::filesystem::path> paths;
-
-	for (std::string key : names){
-		temp_path = out_path;
-		temp_path += key;
-		tempPair = {key, temp_path};
-		paths.insert(tempPair);
-		boost::filesystem::create_directory(temp_path);
-	}
-    cout << "KEY\tPATH\n";															// print the folder paths
-    for (auto itr = paths.begin(); itr != paths.end(); ++itr) {
-        cout << "First:["<<  itr->first << "]\t:\t Second:" << itr->second << "\n";
-    }																				// Now pass the map "paths" to RunCl, to use for saving data.
-*/
 	cout << "\n main_chk 1.2\n" << flush; ////////////////////////////////////////////////////////////////////////////////
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;
 	double reconstructionScale = 1;
@@ -80,11 +55,11 @@ int main()
 																					// TODO use a control file specifying where to sample the video.
 		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
-				   //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
-	//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
+					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
+					//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
 			65535,
 			i + offset,
-			image,
+			image,																	// NB .png image is converted CV_8UC3 -> CV_32FC3, and given GaussianBlurr (3,3).
 			d,
 			cameraMatrix,
 			R,

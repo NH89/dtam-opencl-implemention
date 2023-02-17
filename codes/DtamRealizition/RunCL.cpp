@@ -225,7 +225,7 @@ void RunCL::DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::files
 }
 
 
-void RunCL::calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers) // TODO should be split constructor and updater functions.
+void RunCL::calcCostVol(float* k, float* rt, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers) // TODO should be split constructor and updater functions.
 {
 	cout << "\ncalcCostVol chk0," << flush;
 	stringstream ss;
@@ -335,16 +335,6 @@ void RunCL::calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image,
 			&writeEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 */
-		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
-			rtbuf,
-			CL_FALSE,
-			0,
-			12 * sizeof(float),
-			rt, //////////////////////////////////////  NB "rt" = 3D rotation & translation matrix as an array of 12 floats
-			0,
-			NULL,
-			&writeEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 
 		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
 			kbuf,
@@ -352,6 +342,17 @@ void RunCL::calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image,
 			0,
 			3 * sizeof(float),
 			k, //////////////////////////////////////  NB "k" = camera params {focal_length, c_u, c_v} 3 floats. Assumes fx=fy and no distorsion.
+			0,
+			NULL,
+			&writeEvt);
+		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+
+		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
+			rtbuf,
+			CL_FALSE,
+			0,
+			12 * sizeof(float),
+			rt, //////////////////////////////////////  NB "rt" = 3D rotation & translation matrix as an array of 12 floats
 			0,
 			NULL,
 			&writeEvt);
@@ -378,8 +379,8 @@ void RunCL::calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image,
 		cout<<"\nlayerstep=width*height="<<width<<"*"<<height<<"="<<layerstep<<flush;
 
 		// set kernelArg
-		res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem),  &rtbuf);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // rt
-		res = clSetKernelArg(cost_kernel, 1, sizeof(cl_mem),  &kbuf);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // k
+		res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem),  &kbuf);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // rt
+		res = clSetKernelArg(cost_kernel, 1, sizeof(cl_mem),  &rtbuf);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // k
 		res = clSetKernelArg(cost_kernel, 2, sizeof(cl_mem),  &basemem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // base
 		res = clSetKernelArg(cost_kernel, 3, sizeof(cl_mem),  &imgmem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // img
 		res = clSetKernelArg(cost_kernel, 4, sizeof(cl_mem),  &cdatabuf);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // cdata
@@ -388,28 +389,30 @@ void RunCL::calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image,
 		res = clSetKernelArg(cost_kernel, 7, sizeof(float),   &thresh);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // weight
 		res = clSetKernelArg(cost_kernel, 8, sizeof(int),     &width);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // cols
 		res = clSetKernelArg(cost_kernel, 9, sizeof(cl_mem),  &lomem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // lo
-		res = clSetKernelArg(cost_kernel, 10, sizeof(cl_mem),  &himem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // hi
-		res = clSetKernelArg(cost_kernel, 12, sizeof(cl_mem), &amem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // a
+		res = clSetKernelArg(cost_kernel, 10, sizeof(cl_mem), &himem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // hi
+		res = clSetKernelArg(cost_kernel, 11, sizeof(cl_mem), &amem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // a
 		res = clSetKernelArg(cost_kernel, 12, sizeof(cl_mem), &dmem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // d
 		res = clSetKernelArg(cost_kernel, 13, sizeof(int),    &layers);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // layers
 
 		cout<<"\n\nKernelArgs:";
-		//cout<<"\npbuf="<<pbuf;			//0  "p" Projection matrix, holds an array of 12 images, each as as 2D float array.
+		//cout<<"\npbuf="<<rtbuf;			//0  "rt" rotation & translation, camera pose transform matrix, holds an array of 12 images, each as as 2D float array.
 		cout<<"\n\npose transformation matrix, as floats:\n";
 		for(int p_iter=0;p_iter<12;p_iter++){cout<<"rt["<<p_iter<<"]="<<rt[p_iter]<<"\t\t"; if((p_iter+1)%4==0){cout<<"\n";};}
 		cout<<"\n";
-		//cout<<"\nbasemem="<<basemem ;		//1  baseImage.data  // the keyframe
-		//cout<<"\nimgmem="<<imgmem ;   	//2  image.data		 // the new frame, being added to costvol
-		//cout<<"\ncdatabuf="<<cdatabuf ;	//3  cdata=costdata.data, initialCost, default = 3.0,			initialized when costvol constructed
-		//cout<<"\nhdatabuf="<<hdatabuf ;	//4  hdata=hit.data,  hit = initialWeight, default = .001		initialized when costvol constructed
-		cout<<"\nlayerstep="<<layerstep ;	//5  global_work_size=layerstep=width*height=640*480=307200
-		cout<<"\nthresh="<<thresh ;			//6
-		cout<<"\nwidth="<<width ;			//7
-		//cout<<"\nlomem="<<lomem ;			//8  lomem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res); // used between kernels.
-		//cout<<"\nhimem="<<himem ;			//9  himem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
-		//cout<<"\namem="<<amem ;			//10 amem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
-		//cout<<"\ndmem="<<dmem ;			//11 dmem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
-		cout<<"\nlayers="<<layers ;			//12 layers = 32
+		cout<<"\nkbuf="<<kbuf;				//1
+		cout<<", focal length="<<k[0]<<", c_x="<<k[1]<<", c_y="<<k[2];
+		//cout<<"\nbasemem="<<basemem ;		//2  baseImage.data  // the keyframe
+		//cout<<"\nimgmem="<<imgmem ;   	//3  image.data		 // the new frame, being added to costvol
+		//cout<<"\ncdatabuf="<<cdatabuf ;	//4  cdata=costdata.data, initialCost, default = 3.0,			initialized when costvol constructed
+		//cout<<"\nhdatabuf="<<hdatabuf ;	//5  hdata=hit.data,  hit = initialWeight, default = .001		initialized when costvol constructed
+		cout<<"\nlayerstep="<<layerstep ;	//6  global_work_size=layerstep=width*height=640*480=307200
+		cout<<"\nthresh="<<thresh ;			//7
+		cout<<"\nwidth="<<width ;			//8
+		//cout<<"\nlomem="<<lomem ;			//9  lomem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res); // used between kernels.
+		//cout<<"\nhimem="<<himem ;			//10 himem  = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
+		//cout<<"\namem="<<amem ;			//11 amem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
+		//cout<<"\ndmem="<<dmem ;			//12 dmem   = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);
+		cout<<"\nlayers="<<layers ;			//13 layers = 32
 		cout<<"\n"<<flush;
 
 		local_work_size=32; // trial for nvidia
@@ -526,6 +529,13 @@ void RunCL::calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image,
 		res = clSetKernelArg(cost_kernel, 8, sizeof(int),    &width);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 		res = clSetKernelArg(cost_kernel, 13, sizeof(int),   &layers);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 
+		cout<<"\n\npose transformation matrix, as floats:\n";
+		for(int p_iter=0;p_iter<12;p_iter++){cout<<"rt["<<p_iter<<"]="<<rt[p_iter]<<"\t\t"; if((p_iter+1)%4==0){cout<<"\n";};}
+		cout<<"\n";
+		cout<<"\nkbuf="<<kbuf;				//1
+		cout<<", focal length="<<k[0]<<", c_x="<<k[1]<<", c_y="<<k[2];
+
+
 		cout << "\ncalcCostVol chk11," << flush;
 		cl_event ev;
 		cout<<"\n\nclEnqueueNDRangeKernel(";
@@ -545,6 +555,7 @@ void RunCL::calcCostVol(float* rt, float* k, cv::Mat &baseImage, cv::Mat &image,
 
 		res    = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); //1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); ####### cost_kernel #######
 		status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
+		status = clWaitForEvents (1, &ev);		if (status != CL_SUCCESS)	{ cout << "\nclWaitForEventsh(1, &ev)="	<<status<<" "<<checkerror(status)  <<"\n"<<flush; exit_(status);}
 		status = clFinish(m_queue); 			if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="<<status<<" "<<checkerror(status)<<"\n"<<flush; exit_(status);}
 
 		if (res != CL_SUCCESS)	{ cout << "\nclEnqueueNDRangeKernel res = " << checkerror(res) <<"\n"<<flush; exit_(res);}

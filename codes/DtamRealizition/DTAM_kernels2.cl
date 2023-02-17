@@ -16,12 +16,14 @@
 */
 
 __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
-	__global float* k,		//0  kernelArg numbers
-	__global float* rt,		//1
+// TODO rewrite with homogeneuos coords to handle points at infinity (x,y,z,0) -> (u,v,0)
+							// kernelArg numbers
+	__global float* r,		//0 Rotation-only reprojection matrix for inf depth.
+	__global float* p,		//1 Reprojection matrix
 	__global uchar* base,	//2
 	__global uchar* img,	//3
 	__global float* cdata,	//4
-	__global float* hdata,	//5 'w'
+	__global float* hdata,	//5 'w' num times cost vol elem has been updated
 	int layerStep,			//6 width*height
 	float weight,			//7
 	int cols,				//8
@@ -41,12 +43,12 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	// Get keyframe pixel values
 	int offset_3 = global_id *3;
 	float3 B;	B.x = base[offset_3]; B.y = base[offset_3]; B.z = base[offset_3];	// pixel from keyframe
-
+/*
 	// camera params // could use float3 if fx=fy
 	const float fx = k[0];
 	const float fy = k[0];
 	const float cx = k[1];
-	const float cy = k[3];
+	const float cy = k[2];
 
 	// precalculate components // {a..l}={0..11} elem of rt[], 3D pose transform matrix.
 	float fd_cx = fx*rt[3]/cx;
@@ -54,34 +56,101 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 	float u2_a = (rt[0]*u + rt[1]*v + rt[2]*fx)/cx;
 	float v2_e = (rt[4]*v + rt[5]*v + rt[6]*fy)/cy;
+*/
+	// variables for the cost vol
+	float u2,v2, inv_depth=0.0;
+	int int_u2, int_v2, cv_idx = global_id;
+	int coff_00, coff_01, coff_10, coff_11;
+	float3 c, c_00, c_01, c_10, c_11;
+	float rho;
+	float ns=0.0, mini=0.0, minv=FLT_MAX, maxv=0.0;
+	float c0 = cdata[cv_idx];	// cost for this elem of cost vol
+	float w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
+	int layer = 0;
+
+	// layer zero, ////////////////////////////////////////////////////////////////////////////////////////
+	// inf depth, roation without paralax, i.e. reproj without translation.
+	// Use depth=1 unit sphere, with rotational-preprojection matrix
+	float xi = r[0] * u  + r[1] * v  + r[2]  + r[3];
+	float yi = r[4] * u  + r[5] * v  + r[6]  + r[7];
+	float wi = r[8] * u  + r[9] * v  + r[10] + r[11];
+
+	u2 = xi/wi;
+	v2 = yi/wi;
+
+	//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth);
+
+	int_u2 = ceil(u2);
+	int_v2 = ceil(v2);
+
+	if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { ;}
+	else{
+		// compute adjacent pixel indices
+		coff_11 =  int_v2    * cols +  int_u2;
+		coff_10 = (int_v2-1) * cols +  int_u2;
+		coff_01 =  int_v2    * cols + (int_u2 -1);
+		coff_00 = (int_v2-1) * cols + (int_u2 -1);
+
+		// sample adjacent pixels
+		c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
+		c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
+		c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
+		c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
+
+		// weighting for bi-linear interpolation
+		float factor_x = fmod(u2,1);
+		float factor_y = fmod(v2,1);
+		c = factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // float3, bi-linear interpolation
+
+		// Compute photometric cost															// divide rho by 256 to move from char to float value range.
+		rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/256.0;						// L1 norm between keyframe & new frame pixels.
+		if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
+			ns = (c0*w + rho) / (w + 1);					// c0 = existing value in this costvol elem.
+			cdata[cv_idx] = c.x + c.y + c.z; //ns;					// Costdata, same location c0 was read from.  // CostVol set here ###########
+			hdata[cv_idx] = rho; //w + 1;							// Weightdata, counts updates of this costvol element.
+		}else{
+			ns = c0;										// no update if new pixel is black.
+		}
+		if (ns < minv) { 									// find idx & value of min cost in this ray of cost vol, given this update.
+			minv = ns;
+			mini = layer;
+		}
+		maxv = fmax(ns, maxv);
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// non-zero inv-depth layers
+
+	// precalculate depth-independent part of reprojection
+	xi = p[0] * u  + p[1] * v  + p[3];
+	yi = p[4] * u  + p[5] * v  + p[7];
+	wi = p[8] * u  + p[9] * v  + p[11];
 
 	// Inverse depth step
 	float min_d = 1.0;
 	float max_inv_d = 1/min_d;
 	float inv_d_step = max_inv_d/(layers -1);
 
-	// variables for the cost vol loop
-	float u2,v2, inv_depth=0.0;
-	int int_u2, int_v2, cv_idx;
-	int coff_00, coff_01, coff_10, coff_11;
-	float3 c, c_00, c_01, c_10, c_11;
-	float rho;
-	float ns=0.0, mini=0.0, minv=FLT_MAX, maxv=0.0;
+
 
 	// cost volume loop
-	for(int layer=0; layer<layers; layer++ ){
+	for( layer=1; layer<layers; layer++ ){
 		cv_idx = global_id + layer*layerStep;
-		float c0 = cdata[cv_idx];	// cost for this elem of cost vol
-		float w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
+		c0 = cdata[cv_idx];	// cost for this elem of cost vol
+		w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
 
 		// locate pixel to sample from  new image
 		inv_depth += inv_d_step;
-		u2 = u2_a + fd_cx * inv_depth;
-		v2 = v2_e + fh_cy * inv_depth;
+
+		u2 = (xi + p[2]/inv_depth)/(wi + p[10]/inv_depth); // complete depth-dependent part, sum parts, dehomgenize result
+		v2 = (yi + p[6]/inv_depth)/(wi + p[10]/inv_depth);
+
 		int_u2 = ceil(u2);
 		int_v2 = ceil(v2);
 
-		if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) continue; 	// if (not within new frame)
+		//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth); // u2 and v2 too small
+
+		if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { continue;} 	// if (not within new frame)
 
 		// compute adjacent pixel indices
 		coff_11 =  int_v2    * cols +  int_u2;
@@ -105,8 +174,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/256.0;						// L1 norm between keyframe & new frame pixels.
 		if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
 			ns = (c0*w + rho) / (w + 1);					// c0 = existing value in this costvol elem.
-			cdata[cv_idx] = ns;								// Costdata, same location c0 was read from.  // CostVol set here ###########
-			hdata[cv_idx] = w + 1;							// Weightdata, counts updates of this costvol element.
+			cdata[cv_idx] = c.x + c.y + c.z; //ns;								// Costdata, same location c0 was read from.  // CostVol set here ###########
+			hdata[cv_idx] = rho; //w + 1;							// Weightdata, counts updates of this costvol element.
 		}else{
 			ns = c0;										// no update if new pixel is black.
 		}
@@ -122,7 +191,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	hi[global_id] 	= maxv; 			// max photometric cost
 }
 
-/*
+
 __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	__global float* p,		//0  kernelArg numbers
 	__global uchar* base,	//1
@@ -223,7 +292,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	d[offset_1] 	= ns;//v2;//
 	hi[offset_1] 	= maxv;//c_11.x;//v3;//del;//maxv;//img[coff_11*3];  //  export the images as accessed by the kernel.
 }// # currently all c.x = 0, ie all pixels are out of the keyframe, even for the first image
-*/
+
 
  __kernel void CacheG1(__global char* base, __global float* g1p, int cols, int rows)                        // called as "cache1_kernel" in RunCL.cpp
  {
