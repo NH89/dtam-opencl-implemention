@@ -7,7 +7,7 @@
 using namespace cv;
 
 struct m33 {
-	double data[9];
+	float data[9];
 };
 
 struct m34 {
@@ -45,9 +45,9 @@ static Mat rodrigues(const Mat& p){
 
 static void LieToRT(InputArray Lie, OutputArray _R, OutputArray _T){
     Mat p = Lie.getMat();
-    _R.create(3,3,CV_64FC1);
+    _R.create(3,3,CV_32FC1);
     Mat R = _R.getMat();
-    _T.create(3,1,CV_64FC1);
+    _T.create(3,1,CV_32FC1);
     Mat T = _T.getMat();
     if(p.cols==1){
         p = p.t();
@@ -166,7 +166,7 @@ tp median_(const Mat& _M) {
     return dMedian;
 }
 
-static double median(const Mat& M) {
+static double median(const Mat& M) { // NB only used for tp median_(const Mat& _M) above, which recasts to type tp.
     if(M.type()==CV_32FC1)
         return median_<float>(M);
     if(M.type()==CV_64FC1)

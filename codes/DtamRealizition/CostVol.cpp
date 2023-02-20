@@ -27,7 +27,7 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 	//0  fy cy
 	//0  0  1
 
-	projection.create(4, 4, CV_64FC1);											// NB cv::Mat projection; declared in CostVol.h
+	projection.create(4, 4, CV_32FC1);											// NB cv::Mat projection; declared in CostVol.h
 	projection = 0.0;
 	projection(Range(0, 2), Range(0, 3)) += cameraMatrix.rowRange(0, 2);
 	//Projection:
@@ -36,15 +36,15 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 	//0  0  0  0
 	//0  0  0  0
 
-	projection.at<double>(2, 3) = 1.0;
-	projection.at<double>(3, 2) = 1.0;
+	projection.at<float>(2, 3) = 1.0;
+	projection.at<float>(3, 2) = 1.0;
 	//Projection: Takes camera coordinates to pixel coordinates:x_px,y_px,1/zc
 	//fx 0  cx 0
 	//0  fy cy 0
 	//0  0  0  1
 	//0  0  1  0
 
-	Mat originShift = (Mat)(Mat_<double>(4, 4) << 1.0, 0., 0., 0.,
+	Mat originShift = (Mat)(Mat_<float>(4, 4) << 1.0, 0., 0., 0.,
 		0.,  1.0,  0.,   0.,
 		0.,  0.,   1.0,  -far,
 		0.,  0.,   0.,   1.0);
@@ -59,24 +59,45 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 void CostVol::checkInputs(
     const cv::Mat& R, 
     const cv::Mat& T,
-	const cv::Mat& _cameraMatrix) {
-    
+	const cv::Mat& _cameraMatrix)
+{
+	std::cout<<"\ncheckInputs\n"<< std::flush;
 	assert(R.size() == Size(3, 3));
-	assert(R.type() == CV_64FC1);
+	assert(R.type() == CV_32FC1);
 	assert(T.size() == Size(1, 3));
-	assert(T.type() == CV_64FC1);
+	assert(T.type() == CV_32FC1);
 	assert(_cameraMatrix.size() == Size(3, 3));
-	assert(_cameraMatrix.type() == CV_64FC1);
+	assert(_cameraMatrix.type() == CV_32FC1);
     
-	CV_Assert(_cameraMatrix.at<double>(2, 0) == 0.0);
-	CV_Assert(_cameraMatrix.at<double>(2, 1) == 0.0);
-	CV_Assert(_cameraMatrix.at<double>(2, 2) == 1.0);
+	// print cameraMatrix
+	std::cout<<"\ncameraMatrix.rows="<<cameraMatrix.rows<<",  cameraMatrix.cols="<<cameraMatrix.cols<<"\n"<< std::flush;   // empty Mat why ?
+
+	for (int i=0; i<cameraMatrix.rows; i++){
+		for (int j=0; j<cameraMatrix.cols; j++){
+			std::cout<<", "<<cameraMatrix.at<float>(i,j)<< std::flush;
+		}std::cout<<"\n"<< std::flush;
+	}std::cout<<"\n"<< std::flush;
+
+	CV_Assert(_cameraMatrix.at<float>(2, 0) == 0.0);
+	CV_Assert(_cameraMatrix.at<float>(2, 1) == 0.0);
+	CV_Assert(_cameraMatrix.at<float>(2, 2) == 1.0);
 }
 
-CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
-	float _far, cv::Mat R, cv::Mat T, cv::Mat _cameraMatrix, float occlusionThreshold,
-	boost::filesystem::path out_path,
-	float initialCost, float initialWeight
+
+
+CostVol::CostVol(
+	Mat image,
+	FrameID 	_fid,
+	int 		_layers,
+	float 		_near,
+	float 		_far,
+	cv::Mat 	R,
+	cv::Mat 	T,
+	cv::Mat 	_cameraMatrix,
+	float 		occlusionThreshold,
+	boost::filesystem::path 	out_path,
+	float 		initialCost,
+	float 		initialWeight
 ) // NB defaults: float initialCost = 3.0, float initialWeight = .001
 	:
 	R(R), T(T), occlusionThreshold(occlusionThreshold), initialWeight(initialWeight), cvrc(out_path) // constructors for member classes //
@@ -90,6 +111,81 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	*/
 	//cvrc(out_path);   // ? how to instantiate ?
 	//cvrc.printPaths();
+	cout << "CostVol_chk 0\n" << flush;
+	// New code to
+	// K, inv_K, pose, inv_pose,
+	pose = pose.zeros();
+	cout << "CostVol_chk 1\n" << flush;
+	for (int i=0; i<9; i++) pose.operator()(i/3,i%3) = R.at<float>(i/3,i%3);
+	for (int i=0; i<3; i++) pose.operator()(i,3)     = T.at<float>(i);
+	pose.operator()(3,3) = 1;
+	cout << "CostVol_chk 2\n" << flush;
+	inv_pose = pose.inv();
+
+	cout << "CostVol_chk 3\n" << flush;
+	K = K.zeros();														// NB currently "cameraMatrix" found by convertAhandPovRay, called by fileLoader
+	for (int i=0; i<9; i++) {
+		cout<<"\ni="<<i<<","<<flush;
+		cout<<"\tK.operator()(i/3,i%3)="<<K.operator()(i/3,i%3)<<","<<flush;
+		cout<<"\tcameraMatrix.at<float>(i/3,i%3)="<<_cameraMatrix.at<float>(i/3,i%3)<<","<<flush;
+		K.operator()(i/3,i%3) = _cameraMatrix.at<float>(i/3,i%3);
+
+	} // TODO later, restructure mainloop to build costvol continuously...
+	K.operator()(3,3)  = 1;
+
+	cout << "CostVol_chk 4\n" << flush;
+	float fx   =  K.operator()(0,0);  cout<<"\nfx="  <<fx;
+	float fy   =  K.operator()(1,1);  cout<<"\nfy="  <<fy;
+	float skew =  K.operator()(0,1);  cout<<"\nskew="<<skew;
+	float cx   =  K.operator()(0,2);  cout<<"\ncx="  <<cx;
+	float cy   =  K.operator()(1,2);  cout<<"\ncy="  <<cy;
+
+	cout << "CostVol_chk 5\n" << flush;
+	float scalar = 1/(fx*fy);
+	inv_K = inv_K.zeros();
+	inv_K.operator()(0,0)  = 1.0/fx;  cout<<"\n1.0/fx="<<1.0/fx;
+	inv_K.operator()(1,1)  = 1.0/fy;  cout<<"\n1.0/fy="<<1.0/fy;
+	inv_K.operator()(2,2)  = 1.0;
+	inv_K.operator()(3,3)  = 1.0/(fx*fy);
+
+	inv_K.operator()(0,1)  = -skew/(fx*fy);
+	inv_K.operator()(0,2)  = (cy*skew - cx*fy)/(fx*fy);
+	inv_K.operator()(1,2)  = (-cy*fx)/(fx*fy);
+
+	std::cout << std::fixed << std::setprecision(-1);				//  Inspect values in matricies ///////
+	cout<<"\n\npose\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<pose.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+	cout<<"\n\ninv_pose\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<inv_pose.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+	cout<<"\n\nK\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<K.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+	cout<<"\n\ninv_K\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<inv_K.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+
+
+
+
+	/////////////////////////////////////////////////////////////////////////////
 
 	std::cout << "CostVol_chk 0\n" << std::flush;
 	//For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
@@ -104,18 +200,13 @@ CostVol::CostVol(Mat image, FrameID _fid, int _layers, float _near,
 	layers = _layers;
 	near   = _near;
 	far    = _far;
-    
+    cout << "CostVol_chk 1.1\n" << flush;
 	depthStep    = (near - far) / (layers - 1);
 	cameraMatrix = _cameraMatrix.clone();
     
-
-
-
-
-
 	// solve projection with
 	solveProjection(R, T);
-    
+    cout << "CostVol_chk 1.2\n" << flush;
 	costdata = Mat::zeros(layers, rows * cols, CV_32FC1);
 	costdata = initialCost;
     
@@ -174,11 +265,83 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 	cout << "\nupdateCost chk0," << flush;
 	Mat image;
 	_image.copyTo(image);
-                                                                        //find projection matrix from cost volume to image (3x4)
+
+	// assemble 4x4 cam2cam homogeneous reprojection matrix:   cam2cam = K(4x4) * RT(4x4) * k^-1(4x4)
+	// NB If K changes, then : K from current frame (to be sampled), and K^-1 from keyframe.
+
 	cout << "\nupdateCost chk1," << flush;
-	Mat viewMatrixImage;
-	RTToP(R, T, viewMatrixImage);
-	Mat cameraMatrixTex(3, 4, CV_64FC1);
+	cv::Matx44f poseTransform = cv::Matx44f::zeros();
+	cout<<"\nR.size="<<R.size<<",\tT.size="<<T.size<<"\n"<<flush;   // R.size=3 x 3,	T.size=3 x 1
+
+	for (int i=0; i<9; i++) poseTransform.operator()(i/3,i%3) = R.at<float>(i/3,i%3);
+	for (int i=0; i<3; i++) poseTransform.operator()(i,3)     = T.at<float>(i);			// why is T so large ?
+	poseTransform.operator()(3,3) = 1;
+
+	std::cout << std::fixed << std::setprecision(2);				//  Inspect values in matricies ///////
+	cout<<"\n\nposeTransform\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<poseTransform.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+	cout<<"\ncameraMatrix.size="<<cameraMatrix.size<<"\n"<<flush;   // R.size=3 x 3,	T.size=3 x 1
+
+	cv::Matx44f K = cv::Matx44f::zeros();//    = cameraMatrix;			// NB currently "cameraMatrix" found by convertAhandPovRay, called by fileLoader
+	for (int i=0; i<9; i++) K.operator()(i/3,i%3) = cameraMatrix.at<float>(i/3,i%3);// TODO later, restructure mainloop to build costvol continuously...
+	K.operator()(3,3)  = 1;
+
+	cout<<"\n\n'K' camera intrinsic matrix\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<K.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+	std::cout << std::fixed << std::setprecision(-1);
+	//https://www.imatest.com/support/docs/pre-5-2/geometric-calibration-deprecated/projective-camera/#:~:text=Inverse,lines%20from%20the%20camera%20center.
+	float fx   =  K.operator()(0,0);  cout<<"\nfx="  <<fx;
+	float fy   =  K.operator()(1,1);  cout<<"\nfy="  <<fy;
+	float skew =  K.operator()(0,1);  cout<<"\nskew="<<skew;
+	float cx   =  K.operator()(0,2);  cout<<"\ncx="  <<cx;
+	float cy   =  K.operator()(1,2);  cout<<"\ncy="  <<cy;
+
+/*	inv_K computed in CostVol constructor.
+	cv::Matx44f inv_K = cv::Matx44f::zeros();                    // = K.inv();  // K^-1 from keyframe. Belongs in constructor and costvol object data
+	float scalar = 1/(fx*fy);
+	inv_K = inv_K.zeros();
+	inv_K.operator()(0,0)  = 1.0/fx;  cout<<"\n1.0/fx="<<1.0/fx;
+	inv_K.operator()(1,1)  = 1.0/fy;  cout<<"\n1.0/fy="<<1.0/fy;
+	inv_K.operator()(2,2)  = 1.0;
+	inv_K.operator()(3,3)  = 1.0/(fx*fy); // ? or just 1 ?
+
+	inv_K.operator()(0,1)  = -skew/(fx*fy);
+	inv_K.operator()(0,2)  = (cy*skew - cx*fy)/(fx*fy);
+	inv_K.operator()(1,2)  = (-cy*fx)/(fx*fy);
+*/
+	cout<<"\n\ninv_K\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<inv_K.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+	cv::Matx44f cam2cam = K * poseTransform * inv_pose *  inv_K;	// cam2cam pixel transform, NB requires Pixel=(u,v,1,1/z)^T
+	cout<<"\n\ncam2cam\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<cam2cam.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
+	//////// Need: pose2pose  =  keyframe2world^-1  *  world2newpose
+	// NB it is the keyframe matricies that must be inverted and stored with the costvol object.
+	cout<<"///////////////////////////////////////////////"<<flush;
+
+	/*
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                                                                        //find projection matrix from cost volume to image (3x4)
+	Mat cameraMatrixTex(3, 4, CV_32FC1);
     
 	cout << "\nupdateCost chk2," << flush;
 	cameraMatrixTex = 0.0;
@@ -186,27 +349,35 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 	cameraMatrixTex(Range(0, 2), Range(2, 3)) += 0.5;                   //add 0.5 to x,y out //removing causes crash
 	
 
-	//  Inspect values in matricies
-	std::cout << std::fixed << std::setprecision(2);
+
+	std::cout << std::fixed << std::setprecision(2);					//  Inspect values in matricies ///////
+
+	cout<<"\n\nviewMatrixImage\n";
+	for(int i=0; i<4; i++){
+		for(int j=0; j<4; j++){
+			cout<<"\t"<< std::setw(5)<<viewMatrixImage.operator()(i,j);
+		}cout<<"\n";
+	}cout<<"\n";
+
 
 	cout<<"\n\ncameraMatrix\n";
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
-			cout<<"\t"<< std::setw(5)<<cameraMatrix.at<double>(i,j);
+			cout<<"\t"<< std::setw(5)<<cameraMatrix.at<float>(i,j);
 		}cout<<"\n";
 	}cout<<"\n";
 
 	cout<<"\n\ncameraMatrixTex\n";
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
-			cout<<"\t"<< std::setw(5)<<cameraMatrixTex.at<double>(i,j);
+			cout<<"\t"<< std::setw(5)<<cameraMatrixTex.at<float>(i,j);
 		}cout<<"\n";
 	}cout<<"\n";
 
 	cout<<"\n\nprojection\n";
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
-			cout<<"\t"<< std::setw(5)<<projection.at<double>(i,j);
+			cout<<"\t"<< std::setw(5)<<projection.at<float>(i,j);
 		}cout<<"\n";
 	}cout<<"\n";
 
@@ -214,7 +385,7 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 	cout<<"\n\nprojection.inv()\n";
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
-			cout<<"\t"<< std::setw(5)<<inv_proj.at<double>(i,j);
+			cout<<"\t"<< std::setw(5)<<inv_proj.at<float>(i,j);
 		}cout<<"\n";
 	}cout<<"\n";
 
@@ -228,34 +399,37 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 	cout<<"\n\nimFromWorld = cameraMatrixTex * viewMatrixImage;\n";
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
-			cout<<"\t"<< std::setw(5)<<imFromWorld.at<double>(i,j);
+			cout<<"\t"<< std::setw(5)<<imFromWorld.at<float>(i,j);
 		}cout<<"\n";
 	}cout<<"\n";
 
 	cout<<"\n\nimFromCV = imFromWorld * projection.inv();\n";
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
-			cout<<"\t"<< std::setw(5)<<imFromCV.at<double>(i,j);
+			cout<<"\t"<< std::setw(5)<<imFromCV.at<float>(i,j);
 		}cout<<"\n";
 	}cout<<"\n";
-
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 	cout << "\nupdateCost chk4," << flush;
 	assert(baseImage.isContinuous() );
 	assert(lo.isContinuous() );
 	assert(hi.isContinuous() );
     
+	/*
 	// persp matrix //////////
 	cout << "\nupdateCost chk5," << flush;
-	double *p = (double*)imFromCV.data;
+	float *p = (float*)imFromCV.data;
 	float persp[12];
-	cout<<"\n\nprojection matrix, as doubles:\n";
-	for (int i = 0; i<12; i++) {	// Load the projection matrix as ana array of 12 doubles.
-        persp[i] = p[i]; 			// Implicit conversion double->float.
+	cout<<"\n\nprojection matrix, as floats:\n";
+	for (int i = 0; i<12; i++) {	// Load the projection matrix as ana array of 12 floats.
+        persp[i] = p[i]; 			// Implicit conversion float->float.
     }
     for(int p_iter=0;p_iter<12;p_iter++){cout<<"p["<<p_iter<<"]="<<p[p_iter]<<"\t\t"; if((p_iter+1)%4==0){cout<<"\n";};}
     cout<<"\n";
+	*/
+
 	image = image.reshape(0, rows); // line 85: rows = image.rows, i.e. num rows in the base image. If the parameter is 0, the number of channels remains the same
 	/*
 	//memcpy(costd, (float*)costdata.data, st);
@@ -294,19 +468,22 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 		}cout<<"\n";
 	}cout<<"\n"<<flush;
 	*/
-	cl_int res = 0;
-	cvrc.exit_(res); //////////////// Temporary early halt.
+//	cout<<"\nTemporary early halt.\n"<<flush;   cl_int res = 0;   cvrc.exit_(res); //////////////// Temporary early halt.
 
+/*
 	// reproj_rot
 	float *reproj_rot;
 	//viewMatrixImage
 
 	// reproj_rt
 	float *reproj_rt;
-
+*/
 	cout << "\nupdateCost chk6," << flush;
+	float k2k[16];
+	for (int i=0; i<16; i++){ k2k[i] = cam2cam.operator()(i/4, i%4); }
                                                                         // calls calcCostVol(..) ###############################
-	cvrc.calcCostVol(reproj_rot/*camera_params*/, reproj_rt/*persp*//*rt*/, baseImage, image, (float*)costdata.data, (float*)hit.data, occlusionThreshold, layers);
+	// reproj_rot/*camera_params*/, reproj_rt/*persp*//*rt*/
+	cvrc.calcCostVol(k2k, baseImage, image, (float*)costdata.data, (float*)hit.data, occlusionThreshold, layers);
 	cout << "\nupdateCost chk7_finished\n" << flush;
 	/*
     //memcpy(hit.data, hitd, st);

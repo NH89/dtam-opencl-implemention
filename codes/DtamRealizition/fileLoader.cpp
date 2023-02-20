@@ -13,10 +13,10 @@ static vector<fs::path> txt;
 static vector<fs::path> png;
 static vector<fs::path> depth;
 
-void get_all(const fs::path& root, const string& ext, vector<fs::path>& ret)
+void get_all(const fs::path& root, const string& ext, vector<fs::path>& ret);
 
 void loadAhanda(const char * rootpath,
-                double range,
+                float range,
                 int imageNumber,
                 Mat& image,
                 Mat& d,
@@ -33,7 +33,8 @@ void loadAhanda(const char * rootpath,
     std::string str = txt[imageNumber].c_str();                // grab .txt filename from array (e.g. "scene_00_0000.txt")
     char        *ch = new char [str.length()+1];
     std::strcpy (ch, str.c_str());
-    convertAhandaPovRayToStandard(ch,R,T);                     // read "*.txt" & extract R&T //////
+    convertAhandaPovRayToStandard(ch,R,T,cameraMatrix);        // compute R, T & cameraMatrix from "*.txt"
+    cout<<"Loading image......"<<endl;
     image = imread(png[imageNumber].string());                 // Read image
     image.convertTo(image, CV_32F);                            // convert 8-bit uchar -> 32-bit float
     cv::GaussianBlur(image, image, Size(3,3), 0, 0 );          // Gaussian blur to suppress image artefacts, that later affect photometric error.
@@ -54,15 +55,15 @@ Mat loadDepthAhanda(string filename, int r,int c,Mat cameraMatrix){
         in>>p[i];
         assert(p[i]!=0);
     }
-    Mat_<double> K = cameraMatrix;
-    double fx=K(0,0);
-    double fy=K(1,1);
-    double cx=K(0,2);
-    double cy=K(1,2);
+    Mat_<float> K = cameraMatrix;
+    float fx=K(0,0);
+    float fy=K(1,1);
+    float cx=K(0,2);
+    float cy=K(1,2);
     for (int i=0;i<r;i++){
         for (int j=0;j<c;j++,p++){
-            double x=j;
-            double y=i;
+            float x=j;
+            float y=i;
             x=(x-cx)/fx;
             y=(y-cy)/fy;
             *p=*p/sqrt(x*x+y*y+1);

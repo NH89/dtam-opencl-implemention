@@ -67,7 +67,6 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float c0 = cdata[cv_idx];	// cost for this elem of cost vol
 	float w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
 	int layer = 0;
-
 	// layer zero, ////////////////////////////////////////////////////////////////////////////////////////
 	// inf depth, roation without paralax, i.e. reproj without translation.
 	// Use depth=1 unit sphere, with rotational-preprojection matrix
@@ -77,7 +76,6 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 	u2 = xi/wi;
 	v2 = yi/wi;
-
 	//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth);
 
 	int_u2 = ceil(u2);
@@ -117,9 +115,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		}
 		maxv = fmax(ns, maxv);
 	}
-
-	//////////////////////////////////////////////////////////////////////////////
-	// non-zero inv-depth layers
+	////////////////////////////////////////////////////////////////////////////// // non-zero inv-depth layers
 
 	// precalculate depth-independent part of reprojection
 	xi = p[0] * u  + p[1] * v  + p[3];
@@ -131,8 +127,6 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float max_inv_d = 1/min_d;
 	float inv_d_step = max_inv_d/(layers -1);
 
-
-
 	// cost volume loop
 	for( layer=1; layer<layers; layer++ ){
 		cv_idx = global_id + layer*layerStep;
@@ -141,15 +135,12 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 		// locate pixel to sample from  new image
 		inv_depth += inv_d_step;
-
 		u2 = (xi + p[2]/inv_depth)/(wi + p[10]/inv_depth); // complete depth-dependent part, sum parts, dehomgenize result
 		v2 = (yi + p[6]/inv_depth)/(wi + p[10]/inv_depth);
-
 		int_u2 = ceil(u2);
 		int_v2 = ceil(v2);
 
 		//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth); // u2 and v2 too small
-
 		if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { continue;} 	// if (not within new frame)
 
 		// compute adjacent pixel indices
@@ -193,7 +184,9 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 
 __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
-	__global float* p,		//0  kernelArg numbers
+	//__global float* p,		//0  kernelArg numbers
+
+	__global float* k2k,	//0
 	__global uchar* base,	//1
 	__global uchar* img,	//2
 	__global float* cdata,	//3
@@ -219,11 +212,11 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	unsigned int offset_3 = offset_1 * 3;
 	float xf_1 = xf;
 	float yf_1 = yf;
-	float3 B;	B.x = base[offset_3]; B.y = base[offset_3]; B.z = base[offset_3];	// pixel from keyframe
+	float3 B;	B.x = base[offset_3];  B.y = base[offset_3];  B.z = base[offset_3];	// pixel from keyframe
 													// (wi,xi,yi)=homogeneous coords of keyframe _ray_. // Below old comments, meaning ??
-	float xi = p[0] * xf_1  + p[1] * yf_1  + p[3];	//  xi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];
-	float yi = p[4] * xf_1  + p[5] * yf_1  + p[7];	//  yi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];
-	float wi = p[8] * xf_1  + p[9] * yf_1  + p[11];	//  wi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];
+	float xi = k2k[0] * xf_1  + k2k[1] * yf_1  + k2k[3];	//  xi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];  // TODO rework for inv_depth and k2k using pixel=(u,v,1,1/z) !!!!!!
+	float yi = k2k[4] * xf_1  + k2k[5] * yf_1  + k2k[7];	//  yi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];
+	float wi = k2k[8] * xf_1  + k2k[9] * yf_1  + k2k[11];	//  wi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];
 
 	float minv = 1000.0, maxv = 0.0, mini = 0;
 	barrier(CLK_GLOBAL_MEM_FENCE);
@@ -237,9 +230,9 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 		float c0 = cdata[offset_1 + z*layerStep];	// cost for this elem of cost vol
 		float w  = hdata[offset_1 + z*layerStep];	// weighting for this elem in hdata (weights). w = 001 initially
 													// (wiz,xiz,yiz)=homogeneous pixel coords in new frame of keyframe _point_.
-		float wiz = wi + p[10] * z;
-		float xiz = xi + p[2] * z;
-		float yiz = yi + p[6] * z;
+		float wiz = wi + k2k[10] * z;
+		float xiz = xi + k2k[2] * z;
+		float yiz = yi + k2k[6] * z;
 													// (nx,ny)= integer pixel coords of point in new frame
 		float nx = xiz / wiz;						// NB Need coords of 4 pixels around the projected point.
 		float ny = yiz / wiz;

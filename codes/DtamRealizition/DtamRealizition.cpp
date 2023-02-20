@@ -22,7 +22,7 @@ int main()
 	int numImg = 50;
 	char filename[500];
 	Mat image, R, T;						// TODO where do these values come from ? See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
-	Mat cameraMatrix = (Mat_<double>(3, 3) << 481.20,   0.0,  319.5,
+	Mat cameraMatrix = (Mat_<float>(3, 3) << 481.20,   0.0,  319.5,
 												0.0,  480.0,  239.5,
 												0.0,    0.0,    1.0);
 
@@ -45,7 +45,7 @@ int main()
 
 	cout << "\n main_chk 1.2\n" << flush; ////////////////////////////////////////////////////////////////////////////////
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;
-	double reconstructionScale = 1;
+	float reconstructionScale = 1;
 	int inc = 1;
 
 	cout << "\n main_chk 2\n" << flush;
@@ -61,10 +61,11 @@ int main()
 			i + offset,
 			image,																	// NB .png image is converted CV_8UC3 -> CV_32FC3, and given GaussianBlurr (3,3).
 			d,
-			cameraMatrix,
+			cameraMatrix,															// NB recomputes cameraMatrix for each image, but hard codes 640x480.
 			R,
 			T);
 		cout << ", image.size="<<image.size;
+		cout << "\ncameraMatrix.rows="<<cameraMatrix.rows<<",  cameraMatrix.cols="<<cameraMatrix.rows<<"\n"<<flush;
 
 		images.push_back(image);
 		Rs.push_back(R.clone());
@@ -75,10 +76,23 @@ int main()
 		D0.push_back(1 / d);
 	}
 
+	std::cout<<"\ncameraMatrix.type()="<<cameraMatrix.type()<< std::flush;
+	std::cout<<"\ntype 5 = CV_32FC1\n"<<std::flush;
+	int rows = cameraMatrix.rows;
+	int cols = cameraMatrix.cols;
+
+	for (int i=0; i<rows; i++){
+		for (int j=0; j<cols; j++){
+			std::cout<<", "<<cameraMatrix.at<float>(i,j)<< std::flush;
+		}std::cout<<"\n"<< std::flush;
+	}std::cout<<"\n"<< std::flush;
+
+//	return 0; //#################### early halt #################################
+
 	cout << "\n main_chk 3\n" << flush;
 	//Setup camera matrix
-	double sx 					= reconstructionScale;
-	double sy 					= reconstructionScale;
+	float sx 					= reconstructionScale;
+	float sy 					= reconstructionScale;
 	int layers 					= 32;
 	int imagesPerCV 			= 10;
 	float occlusionThreshold 	= .05;
@@ -86,6 +100,7 @@ int main()
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
                                                                                    // Instantiate CostVol ///////////
 	CostVol cv(images[startAt], (FrameID)startAt, layers, 0.015, 0.0, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path);
+
 
 //	return 0; //#################### early halt #################################
 
@@ -114,7 +129,7 @@ int main()
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;
-	double min = 0, max = 0;
+	//float min = 0, max = 0;
 	cv::Mat depthImg;
 
 	cout << "\n main_chk 8\n" << flush;

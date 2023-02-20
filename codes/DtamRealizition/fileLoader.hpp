@@ -4,7 +4,7 @@
 // loads all files of a given name and extension
 #include "convertAhandaPovRayToStandard.h"
 void loadAhanda(const char * rootpath,
-                double range,
+                float range,
                 int imageNumber,
                 cv::Mat& image,
                 cv::Mat& d,

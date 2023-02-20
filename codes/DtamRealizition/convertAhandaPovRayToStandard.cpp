@@ -11,16 +11,17 @@ using namespace cv;
 using namespace std;
 Vec3f direction;
 Vec3f upvector;
-void convertAhandaPovRayToStandard(const char *filepath,  Mat& R,  Mat& T) // TODO pass by ref intrinsic cameraMatrix
+void convertAhandaPovRayToStandard(const char *filepath,  Mat& R,  Mat& T, Mat& cameraMatrix)
 {
     char     text_file_name[600];                                               // open .txt file
     sprintf(text_file_name,"%s",filepath);
     ifstream cam_pars_file(text_file_name);
     if( !cam_pars_file.is_open() ){  cerr<<"Failed to open param file, check location of sample trajectory!"<<endl;  exit(1); }
     char     readlinedata[300];
-    Point3d  direction;
-    Point3d  upvector;
-    Point3d  posvector;
+    Point3f  direction;
+    Point3f  upvector;
+    Point3f  posvector;
+    Point3f  rightvector;
     while(1){
         cam_pars_file.getline(readlinedata,300);                                // read line
         if ( cam_pars_file.eof() ) break;
@@ -53,21 +54,39 @@ void convertAhandaPovRayToStandard(const char *filepath,  Mat& R,  Mat& T) // TO
             iss >> posvector.z;    iss.ignore(1,',');
             iss >> posvector.y;    iss.ignore(1,',');
         }
-        // TODO extract camera intrinsic information
 
-
+        if ( strstr(readlinedata,"cam_right")!= NULL){                            // "cam_right" pixel aspect ratio
+            string cam_right_str(readlinedata);
+            cam_right_str = cam_right_str.substr(cam_right_str.find("= [")+3);
+            cam_right_str = cam_right_str.substr(0,cam_right_str.find("]"));
+            iss.str(cam_right_str);
+            iss >> rightvector.x;    iss.ignore(1,',');
+            iss >> rightvector.z;    iss.ignore(1,',');
+            iss >> rightvector.y;    iss.ignore(1,',');
+        }
     }
-    R        = Mat(3,3,CV_64F);                                                 // compute rotation & translation
+    R        = Mat(3,3,CV_32F);                                                 // compute rotation & translation
     R.row(0) = Mat(direction.cross(upvector)).t();
     R.row(1) = Mat(-upvector).t();
     R.row(2) = Mat(direction).t();
     T        = -R*Mat(posvector);
 
-    // TODO comput intrinsic cameraMatrix
+    float focal_length  = norm(direction);                                      // compute intrinsic cameraMatrix
+    float aspect_ratio  = norm(rightvector)/norm(upvector);
+    float angle         = norm(rightvector)/norm(direction);
+    int   height        = 480;
+    int   width         = 640;
+    float Ox            = (width +1)*0.5;
+    float Oy            = (height+1)*0.5;
+    float fx            = width  * norm(direction) / norm(rightvector);         // pixel size
+    float fy            = height * norm(direction) / norm(upvector);
 
-   /* cameraMatrix=(Mat_<double>(3,3) << 480,       0.0,    320.    5,
-                                           0.0,   480.0,    240.    5,
-                                           0.0,     0.0,    1.0     ?  );*/
+    float K[9]  = {fx,    0,   Ox, \
+                    0,   fy,   Oy, \
+                    0,    0,    1
+    };
+    cameraMatrix = cv::Mat(3,3, CV_32FC1);
+    for (int i=0; i<9; i++){ cameraMatrix.at<float>(i/3, i%3) = K[i]; }
 }
 
 /*
@@ -80,4 +99,45 @@ cam_sky      = [0, 1, 0]';
 cam_right    = [1.20423, 0.316017, -0.467833]';
 cam_fpoint   = [0, 0, 10]';
 cam_angle    = 90;
+*/
+
+/*
+ * Octave file: "getcamK_octave.m" in "ahanda-icl/camera_codes/Octave/getcamK_octave.m"
+function K = getcamK_octave(cam_file)
+#file reads the camera file (e.g. "scene_00_0231.txt") and gives out the K matrix.
+#https://www.doc.ic.ac.uk/~ahanda/VaFRIC/codes.html
+
+source(cam_file);
+focal  =         norm(cam_dir) ;
+aspect =         norm(cam_right)   / norm(cam_up) ;
+angle  = 2*atan( norm(cam_right)/2 / norm(cam_dir)  ) ;
+
+M      = 480; %cam_height
+N      = 640; %cam.width
+
+width  = N;
+height = M;
+
+% pixel size
+psx = 2*focal*tan(0.5*angle)/N ;
+psy = 2*focal*tan(0.5*angle)/aspect/M ;
+
+psx   = psx / focal;
+psy   = psy / focal ;
+%
+ Sx = psx;
+ Sy = psy;
+
+Ox = (width+1)*0.5;
+Oy = (height+1)*0.5;
+
+f = focal;
+
+K = [1/psx     0     Ox;
+       0    1/psy    Oy;
+       0      0     1];
+
+K(2,2) = -K(2,2);
+
+end
 */
