@@ -79,7 +79,9 @@ public:
 	}
 
 	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show);
+	void DownloadAndSave_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder_tiff, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
 	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
+	void DownloadAndSaveVolume_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
 	void calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
 	void cacheGValue2(cv::Mat &bgray, float theta);
 	//void initializeAD();
@@ -151,6 +153,55 @@ public:
 		default:											return "unknown error code";
 		}
 	}
+
+	string checkCVtype(int input) {
+		int errorCode = input;
+		switch (errorCode) {
+			//case	CV_8U:										return "CV_8U";
+			case	CV_8UC1:										return "CV_8UC1";
+			case	CV_8UC2:										return "CV_8UC2";
+			case	CV_8UC3:										return "CV_8UC3";
+			case	CV_8UC4:										return "CV_8UC4";
+
+			//case	CV_8S:										return "CV_8S";
+			case	CV_8SC1:										return "CV_8SC1";
+			case	CV_8SC2:										return "CV_8SC2";
+			case	CV_8SC3:										return "CV_8SC3";
+			case	CV_8SC4:										return "CV_8SC4";
+
+			//case	CV_16U:										return "CV_16U";
+			case	CV_16UC1:										return "CV_16UC1";
+			case	CV_16UC2:										return "CV_16UC2";
+			case	CV_16UC3:										return "CV_16UC3";
+			case	CV_16UC4:										return "CV_16UC4";
+
+			//case	CV_16S:										return "CV_16S";
+			case	CV_16SC1:										return "CV_16SC1";
+			case	CV_16SC2:										return "CV_16SC2";
+			case	CV_16SC3:										return "CV_16SC3";
+			case	CV_16SC4:										return "CV_16SC4";
+
+			//case	CV_32S:										return "CV_32S";
+			case	CV_32SC1:										return "CV_32SC1";
+			case	CV_32SC2:										return "CV_32SC2";
+			case	CV_32SC3:										return "CV_32SC3";
+			case	CV_32SC4:										return "CV_32SC4";
+
+			//case	CV_32F:										return "CV_32F";
+			case	CV_32FC1:										return "CV_32FC1";
+			case	CV_32FC2:										return "CV_32FC2";
+			case	CV_32FC3:										return "CV_32FC3";
+			case	CV_32FC4:										return "CV_32FC4";
+
+			//case	CV_64F:										return "CV_64F";
+			case	CV_64FC1:										return "CV_64FC1";
+			case	CV_64FC2:										return "CV_64FC2";
+			case	CV_64FC3:										return "CV_64FC3";
+			case	CV_64FC4:										return "CV_64FC4";
+
+			default:										return "unknown CV_type code";
+		}
+	}
 	
 	void allocatemem(float *qx, float *qy, float* gx, float* gy);
 
@@ -163,6 +214,7 @@ public:
 		cl_event readEvt;
 		cl_int status;
 		cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<", offset="<<offset<<"\t"<<flush;
+		status = clFlush(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = "<<status<<" "<< checkerror(status) <<"\n"<<flush; exit_(status);}
 		status = clFinish(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="		<<status<<" "<<checkerror(status)  <<"\n"<<flush; exit_(status);}
 		status = clEnqueueReadBuffer(m_queue,
 											buf_mem,
@@ -185,4 +237,3 @@ public:
 
 	~RunCL();
 };
-

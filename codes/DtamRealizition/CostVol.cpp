@@ -233,11 +233,24 @@ CostVol::CostVol(
 
 	cout << "CostVol_chk 3\n" << flush;
 	image.copyTo(baseImage);
+	/*
+	Mat temp;
+    image.convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
+	cv::imshow("base image CostVol constructor", temp);
+	*/
 	baseImage = baseImage.reshape(0, rows); 				// redundant, given that rows = baseImage.rows
     
 	cout << "CostVol_chk 4\n" << flush;
 	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
+	/*
+	cv::Mat temp;
+	baseImageGray.convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
+	//cv::imshow("bgray", temp);
+	imshow("costVol baseImageGray CV_8U", temp );
+	*/
 	baseImageGray = baseImageGray.reshape(0, rows);			// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
+
+
 	
 	cout << "CostVol_chk 5\n" << flush;
     count      = 0;

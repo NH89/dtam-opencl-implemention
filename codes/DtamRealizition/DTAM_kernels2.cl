@@ -18,20 +18,22 @@
 __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 // TODO rewrite with homogeneuos coords to handle points at infinity (x,y,z,0) -> (u,v,0)
 							// kernelArg numbers
-	__global float* r,		//0 Rotation-only reprojection matrix for inf depth.
-	__global float* p,		//1 Reprojection matrix
-	__global uchar* base,	//2
-	__global uchar* img,	//3
-	__global float* cdata,	//4
-	__global float* hdata,	//5 'w' num times cost vol elem has been updated
-	int layerStep,			//6 width*height
-	float weight,			//7
-	int cols,				//8
-	__global float* lo, 	//9
-	__global float* hi,		//10
-	__global float* a,		//11
-	__global float* d,		//12
-	int layers)				//13 layers=32
+	//__global float* r,		//0 Rotation-only reprojection matrix for inf depth.
+	//__global float* p,		//1 Reprojection matrix
+
+	__global float* k2k,	//0
+	__global float* base,	//1  // uchar*
+	__global float* img,	//2  // uchar*
+	__global float* cdata,	//3
+	__global float* hdata,	//4 'w' num times cost vol elem has been updated
+	int layerStep,			//5 width*height
+	float weight,			//6
+	int cols,				//7
+	__global float* lo, 	//8
+	__global float* hi,		//9
+	__global float* a,		//10
+	__global float* d,		//11
+	int layers)				//12 layers=32
 {
 	int global_id = get_global_id(0);
 	int rows = layerStep/cols;
@@ -63,17 +65,20 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	int coff_00, coff_01, coff_10, coff_11;
 	float3 c, c_00, c_01, c_10, c_11;
 	float rho;
-	float ns=0.0, mini=0.0, minv=FLT_MAX, maxv=0.0;
+	float ns=0.0, mini=0.0, minv=3.0, maxv=0.0; // 3.0 would be max rho for 3 chanels.
 	float c0 = cdata[cv_idx];	// cost for this elem of cost vol
 	float w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
 	int layer = 0;
 	// layer zero, ////////////////////////////////////////////////////////////////////////////////////////
 	// inf depth, roation without paralax, i.e. reproj without translation.
 	// Use depth=1 unit sphere, with rotational-preprojection matrix
+	/*
 	float xi = r[0] * u  + r[1] * v  + r[2]  + r[3];
 	float yi = r[4] * u  + r[5] * v  + r[6]  + r[7];
 	float wi = r[8] * u  + r[9] * v  + r[10] + r[11];
+	*/
 
+	/*
 	u2 = xi/wi;
 	v2 = yi/wi;
 	//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth);
@@ -81,7 +86,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	int_u2 = ceil(u2);
 	int_v2 = ceil(v2);
 
-	if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { ;}
+	if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { ;}				// if (not within new frame) skip ahead...
 	else{
 		// compute adjacent pixel indices
 		coff_11 =  int_v2    * cols +  int_u2;
@@ -116,32 +121,46 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		maxv = fmax(ns, maxv);
 	}
 	////////////////////////////////////////////////////////////////////////////// // non-zero inv-depth layers
+    */
 
-	// precalculate depth-independent part of reprojection
+	// precalculate depth-independent part of reprojection, h=homogeneous coords.
+	float uh2 = k2k[0]*u + k2k[1]*v + k2k[2]*1;  // +k2k[3]/z
+	float vh2 = k2k[4]*u + k2k[5]*v + k2k[6]*1;  // +k2k[7]/z
+	float wh2 = k2k[8]*u + k2k[9]*v + k2k[10]*1; // +k2k[11]/z
+	//float h/z  = k2k[12]*u + k2k[13]*v + k2k[14]*1; // +k2k[15]/z
+
+	/*
 	xi = p[0] * u  + p[1] * v  + p[3];
 	yi = p[4] * u  + p[5] * v  + p[7];
 	wi = p[8] * u  + p[9] * v  + p[11];
+	*/
 
 	// Inverse depth step
 	float min_d = 1.0;
 	float max_inv_d = 1/min_d;
 	float inv_d_step = max_inv_d/(layers -1);
 
-	// cost volume loop
-	for( layer=1; layer<layers; layer++ ){
+	// cost volume loop  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	for( layer=0;  layer<layers; layer++ ){
 		cv_idx = global_id + layer*layerStep;
 		c0 = cdata[cv_idx];	// cost for this elem of cost vol
 		w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
 
-		// locate pixel to sample from  new image
+		// locate pixel to sample from  new image. Depth dependent part.
 		inv_depth += inv_d_step;
-		u2 = (xi + p[2]/inv_depth)/(wi + p[10]/inv_depth); // complete depth-dependent part, sum parts, dehomgenize result
-		v2 = (yi + p[6]/inv_depth)/(wi + p[10]/inv_depth);
+		uh2  = uh2 + k2k[3]*inv_depth;
+		vh2  = vh2 + k2k[7]*inv_depth;
+		wh2  = wh2 + k2k[11]*inv_depth;
+		u2   = uh2/wh2;
+		v2   = vh2/wh2;
+
+		//u2 = (xi + p[2]/inv_depth)/(wi + p[10]/inv_depth); // complete depth-dependent part, sum parts, dehomgenize result
+		//v2 = (yi + p[6]/inv_depth)/(wi + p[10]/inv_depth);
 		int_u2 = ceil(u2);
 		int_v2 = ceil(v2);
 
 		//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth); // u2 and v2 too small
-		if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { continue;} 	// if (not within new frame)
+		if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { continue;} 	// if (not within new frame) skip iteration
 
 		// compute adjacent pixel indices
 		coff_11 =  int_v2    * cols +  int_u2;
@@ -165,8 +184,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/256.0;						// L1 norm between keyframe & new frame pixels.
 		if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
 			ns = (c0*w + rho) / (w + 1);					// c0 = existing value in this costvol elem.
-			cdata[cv_idx] = c.x + c.y + c.z; //ns;								// Costdata, same location c0 was read from.  // CostVol set here ###########
-			hdata[cv_idx] = rho; //w + 1;							// Weightdata, counts updates of this costvol element.
+			cdata[cv_idx] = rho;// ns; //c.x + c.y + c.z; //					// Costdata, same location c0 was read from.  // CostVol set here ###########
+			hdata[cv_idx] = B.x + B.y+ B.z;//w + 1; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
 		}else{
 			ns = c0;										// no update if new pixel is black.
 		}
@@ -176,12 +195,14 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		}
 		maxv = fmax(ns, maxv);
 	}
-	lo[global_id] 	= minv; 			// min photometric cost
-	a[global_id] 	= mini*inv_d_step; 	// inverse distance
-	d[global_id] 	= ns;   			// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?
+	lo[global_id] 	= minv; 			// min photometric cost  // rho;//
+	a[global_id] 	= mini;// c.x + c.y + c.z; //mini*inv_d_step; 	// inverse distance      //  int_u2;//
+	d[global_id] 	= ns;   			// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?   // int_v2;//
 	hi[global_id] 	= maxv; 			// max photometric cost
 }
 
+
+/*
 
 __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	//__global float* p,		//0  kernelArg numbers
@@ -200,9 +221,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	__global float* d,		//11
 	int layers)				//12 layers=32
 {
-	//weight = 0.5;
 	int global_id = get_global_id(0);
-	//int local_id  = get_local_id(0);
 	int xf = global_id; 							// TODO either pass rows in kernel args, OR compile const values for rows, cols, layers, layerStep.
 	int yf = xf / (cols);
 	xf = xf % (cols);
@@ -286,10 +305,12 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	hi[offset_1] 	= maxv;//c_11.x;//v3;//del;//maxv;//img[coff_11*3];  //  export the images as accessed by the kernel.
 }// # currently all c.x = 0, ie all pixels are out of the keyframe, even for the first image
 
+*/
 
- __kernel void CacheG1(__global char* base, __global float* g1p, int cols, int rows)                        // called as "cache1_kernel" in RunCL.cpp
+/*
+ __kernel void CacheG1(__global float* base, __global float* g1p, int cols, int rows)                        // called as "cache1_kernel" in RunCL.cpp
  {
-	 /*
+	 *//*
 	 int global_id = get_global_id(0);
 	 //int local_id  = get_local_id(0);
 	 int x = global_id; // local_work_size NB dynamic depend on gpu params TODO
@@ -298,7 +319,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 		 printf("\nx> cols*rows ##");
 		 return;
 	}                       // If out of range, don't process.
-	*/
+	*//*
 	 int x = get_global_id(0);
 	 int y = x / cols;
 	 x = x % cols;
@@ -356,6 +377,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 gxp[offset] = gx;                             // Save G for this keyframe ref image. 
 	 gyp[offset] = gy;
  }
+ */
 
 /*
   void fsetPositive(float *fpnum)								// Uses bitwise "inclusive OR"  // does NOT WORK
@@ -371,7 +393,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 */
 
 
- __kernel void CacheG3(__global uchar* base, /*__global float* g1p,*/ __global float* gxp, __global float* gyp, int cols, int rows) //, float beta// new version
+ __kernel void CacheG3(__global float* base, /*__global float* g1p,*/ __global float* gxp, __global float* gyp, int cols, int rows) //, float beta// new version
  {
 	 int x = get_global_id(0);
 	 int y = x / cols;

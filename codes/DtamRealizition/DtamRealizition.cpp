@@ -98,6 +98,12 @@ int main()
 	float occlusionThreshold 	= .05;
 	int startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
+
+	/*
+	Mat temp;
+    images[startAt].convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
+	cv::imshow("Initial image main loop", temp );
+	*/
                                                                                    // Instantiate CostVol ///////////
 	CostVol cv(images[startAt], (FrameID)startAt, layers, 0.015, 0.0, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path);
 
@@ -115,6 +121,8 @@ int main()
 	cout << "cacheGValues: =========================================================" << endl;
 	cv.cacheGValues();                                                             // cacheGValues()  elementwise weighting on keframe image gradient
 
+//	int res = 0;
+//	cv.cvrc.exit_(res); // ############## early halt ##############
 //	cv.initializeAD();
 
 	cout << "\n main_chk 6\n" << flush;
