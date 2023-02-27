@@ -469,7 +469,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 			k2kbuf,
 			CL_FALSE,
 			0,
-			3 * sizeof(float),
+			16 * sizeof(float),
 			k2k, //////////////////////////////////////  NB "k2k" = cam2cam pixel transform
 			0,
 			NULL,
@@ -636,7 +636,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 			k2kbuf,
 			CL_FALSE,
 			0,
-			3 * sizeof(float),
+			16 * sizeof(float),
 			k2k, //////////////////////////////////////  NB "k2k" = cam2cam pixel transform
 			0,
 			NULL,
@@ -684,7 +684,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 		res = clSetKernelArg(cost_kernel, 12, sizeof(int),   &layers);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 
 		cout<<"\n\npose transformation matrix, as floats:\n";
-		for(int p_iter=0;p_iter<12;p_iter++){cout<<"rt["<<p_iter<<"]="<<k2k[p_iter]<<"\t\t"; if((p_iter+1)%4==0){cout<<"\n";};}
+		for(int p_iter=0;p_iter<16;p_iter++){cout<<"rt["<<p_iter<<"]="<<k2k[p_iter]<<"\t\t"; if((p_iter+1)%4==0){cout<<"\n";};}
 		cout<<"\n";
 		cout<<"\nk2kbuf="<<k2kbuf;				//1
 		//cout<<", focal length="<<k[0]<<", c_x="<<k[1]<<", c_y="<<k[2];

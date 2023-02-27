@@ -194,6 +194,13 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 			mini = layer;
 		}
 		maxv = fmax(ns, maxv);
+
+		if(u==407 && v==60){
+			float d;
+			if (inv_depth==0){d=0;}
+			else {d=1/inv_depth;}
+			printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f)", layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11]);
+		}
 	}
 	lo[global_id] 	= minv; 			// min photometric cost  // rho;//
 	a[global_id] 	= mini;// c.x + c.y + c.z; //mini*inv_d_step; 	// inverse distance      //  int_u2;//
