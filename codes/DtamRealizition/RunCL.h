@@ -207,7 +207,7 @@ public:
 
 	void ReadOutput(uchar* outmat) {  // cvrc.ReadOutput(_a.data, dmem, image_size_bytes );
 		// DownloadAndSave(dmem, (keyFrameCount*1000 + costVolCount), paths.at("dmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ true );
-		ReadOutput(outmat, dmem,  (width * height * sizeof(float)) );  // image_size_bytes
+		ReadOutput(outmat, amem,  (width * height * sizeof(float)) );  // NB amem initially holds naive inverse depth estimate.
 	}
 
 	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size, size_t offset=0) {

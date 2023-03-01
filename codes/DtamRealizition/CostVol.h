@@ -22,7 +22,7 @@ public:
 		cv::Mat R,  cv::Mat T,  cv::Mat _cameraMatrix,
 		 float occlusionThreshold,
 		 boost::filesystem::path out_path,
-		 float initialCost   = 3.0,
+		 float initialCost   = 1.0,//3.0,
 		 float initialWeight = .001
 		 );
 	RunCL   cvrc;

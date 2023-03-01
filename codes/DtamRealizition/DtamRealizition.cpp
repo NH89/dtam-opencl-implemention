@@ -112,7 +112,7 @@ int main()
 
 	cout << "\n main_chk 4\n" << flush;
 	cout << "calculate cost volume: ================================================" << endl << flush;
-	for (int imageNum = 1; imageNum < 10; imageNum++){                              // Update CostVol ////////////////
+	for (int imageNum = 0; imageNum < 11; imageNum+=1){                              // Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
 	}
@@ -128,12 +128,14 @@ int main()
 	cout << "\n main_chk 6\n" << flush;
 	cout << "optimizing: ===========================================================" << endl;
 	bool doneOptimizing;
+	int opt_count = 0;
 	do {
 		for (int i = 0; i < 10; i++)
 			cv.updateQD();                                                         // Optimize Q, D   (primal-dual)
 		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
-		doneOptimizing = true; // debug single loop TODO remove this line.
-	} while (!doneOptimizing);
+		//doneOptimizing = true; // debug single loop TODO remove this line.
+		opt_count ++;
+	} while (!doneOptimizing && (opt_count<4));
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;

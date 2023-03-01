@@ -136,7 +136,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	*/
 
 	// Inverse depth step
-	float min_d = 1.0;
+	float min_d = 500.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
 	float max_inv_d = 1/min_d;
 	float inv_d_step = max_inv_d/(layers -1);
 
@@ -147,7 +147,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
 
 		// locate pixel to sample from  new image. Depth dependent part.
-		inv_depth += inv_d_step;
+		inv_depth = layer * inv_d_step;
 		uh2  = uh2 + k2k[3]*inv_depth;
 		vh2  = vh2 + k2k[7]*inv_depth;
 		wh2  = wh2 + k2k[11]*inv_depth;
@@ -181,11 +181,11 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		c = factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // float3, bi-linear interpolation
 
 		// Compute photometric cost															// divide rho by 256 to move from char to float value range.
-		rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/256.0;						// L1 norm between keyframe & new frame pixels.
+		rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/(3.0*256.0);	//					// L1 norm between keyframe & new frame pixels.
 		if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
 			ns = (c0*w + rho) / (w + 1);					// c0 = existing value in this costvol elem.
-			cdata[cv_idx] = rho;// ns; //c.x + c.y + c.z; //					// Costdata, same location c0 was read from.  // CostVol set here ###########
-			hdata[cv_idx] = B.x + B.y+ B.z;//w + 1; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
+			cdata[cv_idx] = ns;//rho;//c.x + c.y + c.z; //					// Costdata, same location c0 was read from.  // CostVol set here ###########
+			hdata[cv_idx] = w + 1;//B.x + B.y+ B.z; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
 		}else{
 			ns = c0;										// no update if new pixel is black.
 		}
@@ -195,11 +195,12 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		}
 		maxv = fmax(ns, maxv);
 
-		if(u==407 && v==60){
+		if(u==171 && v==302){  // (u==407 && v==60) corner of picture,  (u==300 && v==121) centre of monitor, (u==171 && v==302) on the desk .
 			float d;
 			if (inv_depth==0){d=0;}
 			else {d=1/inv_depth;}
-			printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f)", layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11]);
+			printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f), c0=%f, w=%f, ns=%f, rho=%f, minv=%f, mini=%f", \
+			layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11], c0, w, ns, rho, minv, mini);
 		}
 	}
 	lo[global_id] 	= minv; 			// min photometric cost  // rho;//

@@ -42,7 +42,7 @@ void loadAhanda(const char * rootpath,
     image.convertTo(image, CV_32F);                            // convert 8-bit uchar -> 32-bit float
     /*
     Mat temp;
-    image.convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
+    image.convertTo(temp, CV_8U);                              // NB need CV_U8 for imshow(..)
     cv::imshow("loadAhanda CV_32F", temp);
     */
     cv::GaussianBlur(image, image, Size(3,3), 0, 0 );          // Gaussian blur to suppress image artefacts, that later affect photometric error.

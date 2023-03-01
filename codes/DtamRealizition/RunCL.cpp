@@ -155,7 +155,7 @@ void RunCL::createFolders(boost::filesystem::path out_path){
 
 
 void RunCL::DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder_tiff, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show ){
-		cout<<"\n\nDownloadAndSave filename = ["<<folder_tiff.filename()<<"] folder="<<folder_tiff<<", image_size_bytes="<<image_size_bytes<<", size_mat="<<size_mat<<", type_mat="<<size_mat<<"\t"<<flush;
+		cout<<"\n\nDownloadAndSave filename = ["<<folder_tiff.filename().string()<<"] folder="<<folder_tiff<<", image_size_bytes="<<image_size_bytes<<", size_mat="<<size_mat<<", type_mat="<<size_mat<<"\t"<<flush;
 		cv::Mat temp_mat = cv::Mat::zeros (size_mat, type_mat);									//(int rows, int cols, int type)
 		ReadOutput(temp_mat.data, buffer,  image_size_bytes); 									// NB contains elements of type_mat, (CV_32FC1 for most buffers)
 		cv::Scalar sum = cv::sum(temp_mat);														// NB always returns a 4 element vector.
@@ -178,6 +178,8 @@ void RunCL::DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem:
 		folder_png  += "/png/";
 		folder_png  += ss.str();
 		folder_png  += ".png";
+
+		cout<<"\n\nDownloadAndSave filename = ["<<ss.str()<<"]";
 
 		//if (type_mat == CV_32FC1) {	// ### _Why_ are temp_mat values > 1 when it is CV_32FC1 ?
 					/*(temp_mat*(1/maxVal))*/	// NB .tiff values from 0.0 to 1.0
@@ -334,7 +336,7 @@ void RunCL::DownloadAndSaveVolume_3Channel(cl_mem buffer, std::string count, boo
 }
 */
 
-void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers) // TODO should be split constructor and updater functions.
+void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, cv::Mat &image, float *cdata /*default all=3.0*/, float *hdata, float thresh, int layers) // TODO should be split constructor and updater functions.
 {
 	cout << "\ncalcCostVol chk0," << flush;
 	stringstream ss;
@@ -393,7 +395,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 		ReadOutput(temp_mat.data, basemem,  image_size_bytes);
 
 		cv::Mat temp;
-		baseImage.convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
+		baseImage.convertTo(temp, CV_8U);                             			// NB need CV_U8 for imshow(..)
 		cv::imshow("basemem_host", temp);
 
 		cv::Mat temp2;
@@ -403,7 +405,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 		clFlush(m_queue);
 		status = clFinish(m_queue); 			if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="<<status<<" "<<checkerror(status)<<"\n"<<flush; exit_(status);}
 
-		ss << keyFrameCount;
+		//ss << keyFrameCount;
 		DownloadAndSave_3Channel(basemem, ss.str(), paths.at("basemem"), image_size_bytes, baseImage.size(), baseImage.type(), /*show=*/ false );
 		cout << "\ncalcCostVol chk2.2\n" << flush;
 
@@ -411,7 +413,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 			imgmem,
 			CL_FALSE,
 			0,
-			image_size_bytes,								// = baseImage.total() * baseImage.elemSize() ;		// wrong:width * height * pixelSize,
+			image_size_bytes,													// = baseImage.total() * baseImage.elemSize() ;		// wrong:width * height * pixelSize,
 			image.data,// writing baseImage.data instead does not alter the problem.
 			0,
 			NULL,
@@ -425,7 +427,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 		ReadOutput(temp_mat.data, imgmem,  image_size_bytes);// Debug img chk
 		// /*
 		//cv::Mat temp;
-		temp_mat.convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
+		temp_mat.convertTo(temp, CV_8U);                             			// NB need CV_U8 for imshow(..)
 		cv::imshow("imgmem_downloaded", temp);
 		// */
 		clFlush(m_queue);
@@ -436,7 +438,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 			CL_FALSE,
 			0,
 			width * height * layers * sizeof(float),
-			cdata,
+			cdata,																// default all elements = 3.0, set in CostVol.h
 			0,
 			NULL,
 			&writeEvt);
@@ -452,18 +454,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 			NULL,
 			&writeEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-/*
-		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
-			pbuf,
-			CL_FALSE,
-			0,
-			12 * sizeof(float),
-			p, //////////////////////////////////////  NB "p" = projection matrix as an array of 12 floats
-			0,
-			NULL,
-			&writeEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-*/
+
 
 		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
 			k2kbuf,
@@ -476,29 +467,6 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 			&writeEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 
-/*
-		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
-			kbuf,
-			CL_FALSE,
-			0,
-			3 * sizeof(float),
-			k, //////////////////////////////////////  NB "k" = camera params {focal_length, c_u, c_v} 3 floats. Assumes fx=fy and no distorsion.
-			0,
-			NULL,
-			&writeEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-
-		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
-			rtbuf,
-			CL_FALSE,
-			0,
-			12 * sizeof(float),
-			rt, //////////////////////////////////////  NB "rt" = 3D rotation & translation matrix as an array of 12 floats
-			0,
-			NULL,
-			&writeEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-*/
 
 		cout << "\ncalcCostVol chk5," << flush;
 		status = clFlush(m_queue); 						if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
@@ -612,26 +580,7 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 																			// flush command queue to device 			// wait for device to complete execution
 		status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) clEnqueueWriteBuffer imgmem status = " << checkerror(status) <<"\n"<<flush; exit_(status); }
 		status = clWaitForEvents(1, &writeEvt); if (status != CL_SUCCESS)	{ cout << "\nclWaitForEvents clEnqueueWriteBuffer imgmem status = "<<status<<"  "<<checkerror(status) <<"\n"<<flush; exit_(status); }
-/*
-		cout << "\n\nm_queue=" <<m_queue<<
-				"\n pbuf=" <<pbuf<<
-				"\n CL_FALSE=" <<CL_FALSE<<
-				"\n p=" <<p<<
-				"\n &writeEvt=" <<&writeEvt<< flush;
-*/
 
-/*
-		status = clEnqueueWriteBuffer(m_queue,
-			pbuf,
-			CL_FALSE,
-			0,
-			12 * sizeof(float),
-			p,
-			0,
-			NULL,
-			&writeEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nclEnqueueWriteBuffer pbuf status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-*/
 		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
 			k2kbuf,
 			CL_FALSE,
@@ -643,29 +592,6 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 			&writeEvt);
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 
-/*
-		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
-			rtbuf,
-			CL_FALSE,
-			0,
-			12 * sizeof(float),
-			rt, //////////////////////////////////////  NB "rt" = 3D rotation & translation matrix as an array of 12 floats
-			0,
-			NULL,
-			&writeEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-
-		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer pbuf #############
-			kbuf,
-			CL_FALSE,
-			0,
-			3 * sizeof(float),
-			k, //////////////////////////////////////  NB "k" = camera params {focal_length, c_u, c_v} 3 floats. Assumes fx=fy and no distorsion.
-			0,
-			NULL,
-			&writeEvt);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-*/
 
 		cout << "\n\ncalcCostVol chk9, m_queue="<<m_queue<< flush;			// flush command queue to device			// clFinish needs command_queue, not event list.
 		status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
@@ -740,8 +666,8 @@ void RunCL::calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, 
 	DownloadAndSave(dmem,   ss.str(), paths.at("dmem"),   width * height * sizeof(float),   baseImage_size,   CV_32FC1, 		 /*show=*/ false );
 
 	// Cost & Hit Volume data
-	if (costVolCount == 9){
-		cout<<"\ncostVolCount == 9, Calling DownloadAndSaveVolume";
+	if (costVolCount == 11){
+		cout<<"\ncostVolCount == 11, Calling DownloadAndSaveVolume";
 		DownloadAndSaveVolume(cdatabuf, ss.str(), paths.at("cdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
 		DownloadAndSaveVolume(hdatabuf, ss.str(), paths.at("hdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
 	}
@@ -912,240 +838,7 @@ void RunCL::cacheGValue2(cv::Mat &bgray, float theta) // TODO combine cache3_ker
 	cout<<"\ncacheGValue_chk3_finished"<<flush;
 }
 
-/*
-void RunCL::cacheGValue(cv::Mat &bgray)
-{
-	cout<<"\ncacheGValue_chk0"<<flush;
-	cl_int status;
-	cl_int res;
-	size_t bgraySize_bytes = bgray.total() * bgray.elemSize();
-	cl_event ev;
 
-	if (basegraymem == 0) {
-		cout<<"\ncacheGValue_chk1"<<flush;
-		basegraymem = clCreateBuffer(m_context, CL_MEM_READ_ONLY , bgraySize_bytes, 0, &res); // CL_MEM_READ_ONLY | (1 << 6)
-
-		cout<<"\ncacheGValue_chk2"<<flush;
-		status = clEnqueueWriteBuffer(m_queue, // WriteBuffer basegraymem ##########
-			basegraymem,
-			CL_FALSE,
-			0,
-			width * height,
-			bgray.data,
-			0,
-			NULL,
-			&ev);
-		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-	}
-	cout<<"\ncacheGValue_chk3"<<flush;
-
-	res = clSetKernelArg(cache1_kernel, 0, sizeof(cl_mem), &basegraymem);if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(cache1_kernel, 1, sizeof(cl_mem), &g1mem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(cache1_kernel, 2, sizeof(int),    &width);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(cache1_kernel, 3, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-
-	cout<<"\ncacheGValue_chk4"<<flush;
-	*//*
-	//## from OpenCL_SPH
-	// Find the maximum dimensions of the work-groups
-    cl_uint num;
-    clGetDeviceInfo(devices[0], CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(cl_uint), &num, NULL);
-
-    // Get the max. dimensions of the work-groups
-    size_t dims[num];
-    clGetDeviceInfo(devices[0], CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(dims), &dims, NULL);
-    max_work_item_size = dims[0]; // For now just take the first dimension;
-
-	// pso.po2_workgroup_size = max_work_item_size = local_work_size
-
-	//##
-	*//*
-	const size_t this_global_work_size = 480*640;  //{global_work_size, 256};
-	clFlush(m_queue);
-	clFinish(m_queue);
-	res = clEnqueueNDRangeKernel(m_queue, cache1_kernel, 1, 0, &this_global_work_size, 0, 0, NULL, &ev); // run cache1_kernel  aka CacheG1(..) ################
-
-	cout<<"\nthis_global_work_size="<<this_global_work_size <<", local_work_size="<< local_work_size  <<flush;
-	clFlush(m_queue);
-	clFinish(m_queue);
-	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
-
-	DownloadAndSave(basegraymem, (keyFrameCount ), paths.at("basegraymem"), bgraySize_bytes, bgray.size(),   bgray.type(),  true);
-	DownloadAndSave(g1mem, 		 (keyFrameCount ), paths.at("g1mem"), 		bgraySize_bytes * sizeof(float), baseImage_size, CV_32FC1 , true);
-
-	cout<<"\ncacheGValue_chk5"<<flush;
-	*//*
-    size_t st = width * height * sizeof(float);
-	float* g1 = (float*)malloc(st);
-	cl_event readEvt;
-	status = clEnqueueReadBuffer(m_queue,  // ReadBuffer g1mem ###########
-		g1mem,
-		CL_FALSE,
-		0,
-		st,
-		g1,
-		0,
-		NULL,
-		&readEvt);
-	status = clFlush(m_queue);
-	status = waitForEventAndRelease(&readEvt);
-	cv::Mat qx;
-	qx.create(height, width, CV_32FC1); qx.reshape(0, height);
-	memcpy(qx.data, g1, st);
-	float min = 0, max = 0;
-	cv::minMaxIdx(qx, &min, &max);
-	*//*
-	res = clSetKernelArg(cache2_kernel, 0, sizeof(cl_mem), &g1mem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(cache2_kernel, 1, sizeof(cl_mem), &gxmem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(cache2_kernel, 2, sizeof(cl_mem), &gymem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(cache2_kernel, 3, sizeof(int),    &width);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(cache2_kernel, 4, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-
-	cout<<"\ncacheGValue_chk6"<<flush;
-	clFlush(m_queue);
-	clFinish(m_queue);
-	res = clEnqueueNDRangeKernel(m_queue, cache2_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); //1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run cache2_kernel  aka CacheG2(..) #####################
-	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
-
-	cout<<"\ncacheGValue_chk7"<<flush;
-	// download & save buffers that were written to.
-	clFlush(m_queue);
-	clFinish(m_queue);
-
-	DownloadAndSave(gxmem,		 (keyFrameCount ), paths.at("gxmem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1,  true);
-	DownloadAndSave(gymem, 		 (keyFrameCount ), paths.at("gymem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1,  true);
-	clFlush(m_queue);
-	clFinish(m_queue);
-
-	cout<<"\nglobal_work_size="<<global_work_size<<", local_work_size="<<local_work_size<<", bgraySize_bytes="<<bgraySize_bytes<<", bgray.size()="<<bgray.size()<<", baseImage_size="<<baseImage_size<<", bgray.type()="<<bgray.type()<<flush;
-	cout<<"\ncacheGValue_chk_8_finished"<<flush;
-	//exit_(0); // Early stop here.
-}
-*/
-
-/*
-void RunCL::initializeAD(){
-	cout<<"\ninitializeAD_chk1"<<flush;
-	stringstream ss;
-	ss << "initializeAD";
-	cl_int 		res = CL_SUCCESS;
-	cl_event 	ev;
-	int layerstep = width * height;
-	costVolCount++;
-	cout<<"\nlayerstep="<<layerstep<<"\n"<<flush;
-
-	res = clSetKernelArg(initializeAD_kernel, 0, sizeof(cl_mem), &cdatabuf);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\tcdatabuf\n"		<<flush;exit_(res);} // cdata
-	res = clSetKernelArg(initializeAD_kernel, 1, sizeof(cl_mem), &amem);			if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\tamem\n"			<<flush;exit_(res);}
-	res = clSetKernelArg(initializeAD_kernel, 2, sizeof(cl_mem), &dmem);			if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\tdmem\n"			<<flush;exit_(res);}
-	res = clSetKernelArg(initializeAD_kernel, 3, sizeof(int),    &costVolLayers);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\tcostVolLayers\n"	<<flush;exit_(res);}
-	res = clSetKernelArg(initializeAD_kernel, 4, sizeof(int),    &layerstep);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\tlayerstep\n"		<<flush;exit_(res);}
-
-	clFlush(m_queue); clFinish(m_queue); if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
-
-	cout<<"\ninitializeAD_chk2"<<flush;
-	clFlush(m_queue); clFinish(m_queue); res = clEnqueueNDRangeKernel(m_queue, initializeAD_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);
-	clFlush(m_queue); clFinish(m_queue); if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
-
-	ss << (keyFrameCount*1000 + costVolCount);
-	DownloadAndSave(amem, ss.str(), paths.at("amem"),  width * height * sizeof(float), baseImage_size, CV_32FC1,  true );
-	DownloadAndSave(dmem, ss.str(), paths.at("dmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1,  true );
-	clFlush(m_queue); clFinish(m_queue);
-}
-*/
-
-/*
-void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)		// original version
-{
-	cout<<"\nRunCL::updateQD_chk0"<<flush;
-	stringstream ss;
-	ss << "updateQD";
-	cl_int status;
-	cl_int res;
-	cl_event ev; 
-	
-	res = clSetKernelArg(updateQ_kernel, 0, sizeof(cl_mem), &gxmem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateQ_kernel, 1, sizeof(cl_mem), &gymem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateQ_kernel, 2, sizeof(cl_mem), &gqxmem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateQ_kernel, 3, sizeof(cl_mem), &gqymem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateQ_kernel, 4, sizeof(cl_mem), &dmem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateQ_kernel, 5, sizeof(float),  &epsilon);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}	//Huber parameter
-	res = clSetKernelArg(updateQ_kernel, 6, sizeof(float),  &theta);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);} //Coupling parameter
-	res = clSetKernelArg(updateQ_kernel, 7, sizeof(int),    &width);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateQ_kernel, 8, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	
-	cout<<"\nRunCL::updateQD_chk1"<<flush;
-	clFlush(m_queue);
-	clFinish(m_queue);
-	res = clEnqueueNDRangeKernel(m_queue, updateQ_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); //1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run updateQ_kernel  aka UpdateQ(..) ####################
-	clFlush(m_queue);
-	clFinish(m_queue);
-	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
-
-	cout<<"\nRunCL::updateQD_chk2"<<flush;
-	size_t st = width * height * sizeof(float);
-	float* gqx = (float*)malloc(st);
-	cl_event readEvt;
-
-	cout<<"\nRunCL::updateQD_chk3"<<flush;
-	status = clEnqueueReadBuffer(m_queue,  // readBuffer  gqxmem #########
-		gqxmem,
-		CL_FALSE,
-		0,
-		st,
-		gqx,
-		0,
-		NULL,
-		&readEvt);
-	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-
-	cout<<"\nRunCL::updateQD_chk4"<<flush;
-	status = clFlush(m_queue);					if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-	status = waitForEventAndRelease(&readEvt);	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-
-	cout<<"\nRunCL::updateQD_chk5"<<flush;
-	cv::Mat qx;
-	qx.create(1, width*height, CV_32FC1);
-	memcpy(qx.data, gqx, st);
-	float min = 0, max = 0;
-	cv::minMaxIdx(qx, &min, &max);
-
-	cout<<"\nRunCL::updateQD_chk6"<<flush;
-	res = clSetKernelArg(updateD_kernel, 0, sizeof(cl_mem), &gqxmem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateD_kernel, 1, sizeof(cl_mem), &gqymem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateD_kernel, 2, sizeof(cl_mem), &dmem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateD_kernel, 3, sizeof(cl_mem), &amem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateD_kernel, 4, sizeof(float),  &theta);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}	//Coupling parameter
-	res = clSetKernelArg(updateD_kernel, 5, sizeof(float),  &sigma_d);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}	//Sigma = ?
-	res = clSetKernelArg(updateD_kernel, 6, sizeof(int),    &width);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-
-	cout<<"\nRunCL::updateQD_chk7"<<flush;
-	status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-	status = clFinish(m_queue); 			if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="<<status<<" "<<checkerror(status)<<"\n"<<flush; exit_(status);}
-
-	res = clEnqueueNDRangeKernel(m_queue, updateD_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); //1, NULL, &global_work_size, &local_work_size, 0, NULL, &ev); // run updateD_kernel  aka UpdateD(..) ####################
-	status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
-	status = clFinish(m_queue); 			if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="<<status<<" "<<checkerror(status)<<"\n"<<flush; exit_(status);}
-	if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
-
-	cout<<"\nRunCL::updateQD_chk8"<<flush;
-	QDcount++;
-
-	int this_count = count + QDcount;
-	ss << this_count;
-	//Q
-	DownloadAndSave(gqxmem, ss.str(), paths.at("gxmem"),   width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
-	DownloadAndSave(gqymem, ss.str(), paths.at("gymem"),   width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
-	//D
-	DownloadAndSave(gqxmem, ss.str(), paths.at("gqxmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
-	DownloadAndSave(gqymem, ss.str(), paths.at("gqymem"),  width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
-	DownloadAndSave(dmem,   ss.str(), paths.at("dmem"),    width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
-	DownloadAndSave(amem,   ss.str(), paths.at("amem"),    width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
-	clFlush(m_queue);
-	clFinish(m_queue);
-
-	cout<<"\nRunCL::updateQD_chk9_finished\n"<<flush;
-}
-*/
 
 void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 {
