@@ -195,6 +195,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		}
 		maxv = fmax(ns, maxv);
 
+		// Print out data at one pixel, at each layer:
 		if(u==171 && v==302){  // (u==407 && v==60) corner of picture,  (u==300 && v==121) centre of monitor, (u==171 && v==302) on the desk .
 			float d;
 			if (inv_depth==0){d=0;}
@@ -207,6 +208,28 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	a[global_id] 	= mini;// c.x + c.y + c.z; //mini*inv_d_step; 	// inverse distance      //  int_u2;//
 	d[global_id] 	= ns;   			// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?   // int_v2;//
 	hi[global_id] 	= maxv; 			// max photometric cost
+
+	// refinement step - from DTAM Mapping
+	/*
+	Cmin[i]	   = Cost_min;
+	CminIdx[i] = far + float(minl)*depthStep;// inverse depth which minimize photomeric error
+	Cmax[i]	   = Cost_max;
+	if(minl == 0 || minl == layers-1) return;// first or last inverse depth was best
+	const float A = Cost[i+(minl-1)*layerStep];
+	const float B = Cost_min;
+	const float C = Cost[i+(minl+1)*layerStep];
+	float delta = ((A+C)==2*B)? 0.0f : ((C-A)*depthStep)/(2*(A-2*B+C));
+	delta = (fabsf(delta) > depthStep)? 0.0f : delta;// if the gradient descent step is less than one whole inverse depth interval, reject interpolation
+	CminIdx[i] += delta;
+	*/
+	if(mini == 0 || mini == layers-1) return;// first or last inverse depth was best
+	const float A_ = cdata[(int)(global_id + (mini-1)*layerStep)]  ;//Cost[i+(minl-1)*layerStep];
+	const float B_ = minv;
+	const float C_ = cdata[(int)(global_id + (mini+1)*layerStep)]  ;//Cost[i+(minl+1)*layerStep];
+	float delta = ((A_+C_)==2*B_)? 0.0f : ((C_-A_)*inv_d_step)/(2*(A_-2*B_+C_));
+	delta = (fabs(delta) > inv_d_step)? 0.0f : delta;// if the gradient descent step is less than one whole inverse depth interval, reject interpolation
+	a[global_id] += delta;																		// CminIdx[i] = .. ////
+																			// NB CminIdx used to initialize A & D
 }
 
 
@@ -351,7 +374,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 
 	 g0x = fabs(pr - pl);                          // abs value of vert & horiz gradients.
 	 g0y = fabs(pd - pu);
-	  
+
 	 g0 = fmax(g0x, g0y);                          // max of vert & horiz gradients.
 	 g1 = sqrt(g0);
 	 g1 = exp(-3.5 * g1);
@@ -366,8 +389,8 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 if(x> cols*rows){return;}                     // If out of range, don't process.
 	 int y = x / cols;
 	 x = x % cols;
-	 unsigned int offset = x + y * cols; 
-	 
+	 unsigned int offset = x + y * cols;
+
 	 int dnoff = (y < rows-1) * cols;              // down and right one pixel offsets, unless at the edge of image.
 	 int rtoff = (x < cols-1);
 	 float g1h, g1l, g1r, g1u, g1d,gx,gy;
@@ -381,8 +404,8 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 g1r = g1p[offset + rtoff];
 	 gx = fmax(g1l, g1r);                          // pick max of this & adj g1 value, for vert & horiz
 	 gy = fmax(g1u, g1d);
-	
-	 gxp[offset] = gx;                             // Save G for this keyframe ref image. 
+
+	 gxp[offset] = gx;                             // Save G for this keyframe ref image.
 	 gyp[offset] = gy;
  }
  */
@@ -531,7 +554,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 float d  = dpt[pt];
 	 float a  = apt[pt];
 
-	 float val 		= (q + sigma_q * g1 * d)/(1 + sigma_q + epsilon);
+	 float val 		= (q + sigma_q * g1 * d)/(1 + sigma_q * epsilon);
 	 float q_next 	= val/fmax((float)1.0,(float)fabs(val));
 	 float d_next 	= (d + sigma_d*((g1*q_next) + (a/theta)))/(1 + (sigma_d/theta));
 
@@ -621,7 +644,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 unsigned int pt = x + y * cols;               // index of this pixel
 
 	 barrier(CLK_GLOBAL_MEM_FENCE);
-	
+
 	 float dh = dpt[pt];                           // depth 'here'
 	 float gqx, gqy, dr, dd, qx, qy, gx, gy;       // GQx,y, D_right, D_down, Q, G ?
 
@@ -671,7 +694,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 gqr = gqxpt[pt];
 	 gql = gqxpt[pt + lfoff];
 	 dacc = gqr - gql;                                               // depth_accumulator = gq_right - gq_left
-	
+
 	 float gqu, gqd;
 	 float d = dpt[pt];                                              // Depthmap 'd'
 	 float a = apt[pt];                                              // Auxiliary_variable 'a'
@@ -679,19 +702,19 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 gqu = gqypt[pt + upoff];                                        // gq_up
 	 if (y == 0)gqu = 0;
 	 dacc += gqd - gqu;                                              // depth_accumulator += gq_down - gq_up
-	
+
 	 d = (d + sigma_d*(dacc + a / theta)) / (1 + sigma_d / theta);   // Update 'd' depthmap, from step 1 in DTAM paper.
 
 	 dpt[pt] = d;
  }
 */
- 
+
  float afunc(float data, float theta, float d, float ds, int a, float lambda)                               // used in __kernel void UpdateA(...) below
  {
 	 return 1.0 / (2.0*theta)*ds*ds*(d - a)*(d - a) + data * lambda;                     // Eq(14) from the DTAM paper. ds= depthStep= 1.0f / layers
  }
 
- 
+
  __kernel void UpdateA(
 	 __global float* cdata,                                                               // called as "updateA_kernel" in RunCL.cpp
 	 __global float* a,
@@ -746,7 +769,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 B = minv;//avoid divide by zero, since B is already <= others, make < others
 
 	 float denom = (A - 2 * B + C);            // gradient E^aux                         // Single Newton step for refinement of Auxiliary_variable 'a'
-	 float delt = (A - C) / (denom * 2);       // grad^2 E^aux                           // See section 2.2.5 of the DTAM paper, 
+	 float delt = (A - C) / (denom * 2);       // grad^2 E^aux                           // See section 2.2.5 of the DTAM paper,
                                                                                          // "Increasing Solution Accuracy".
 	 if (denom != 0)
 		 a[pt] = delt + (float)mini;

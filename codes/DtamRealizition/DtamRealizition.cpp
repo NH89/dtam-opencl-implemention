@@ -93,7 +93,7 @@ int main()
 	//Setup camera matrix
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
-	int layers 					= 32;
+	int layers 					= 32;//64;//
 	int imagesPerCV 			= 10;
 	float occlusionThreshold 	= .05;
 	int startAt 				= 0;
