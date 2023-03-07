@@ -20,6 +20,7 @@ int main()
 {
 	cout << "\n main_chk 0\n" << flush;
 	int numImg = 50;
+	int imagesPerCV 			= 30;
 	char filename[500];
 	Mat image, R, T;						// TODO where do these values come from ? See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
 	Mat cameraMatrix = (Mat_<float>(3, 3) << 481.20,   0.0,  319.5,
@@ -49,11 +50,12 @@ int main()
 	int inc = 1;
 
 	cout << "\n main_chk 2\n" << flush;
-	for (int i =0; i < 11; i += inc) {												// Load images & data from file into c++ vectors
+	for (int i =0; i < imagesPerCV; i += inc) {												// Load images & data from file into c++ vectors
 		Mat tmp, d, image;
-		int offset = 462;//380;//0;// better location in this dataset for translation for paralax flow.
+		int offset = 10;//46;//462;//380;//0;// better location in this dataset for translation for paralax flow.
 																					// TODO use a control file specifying where to sample the video.
 		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
+				   //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
 					//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
@@ -93,8 +95,8 @@ int main()
 	//Setup camera matrix
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
-	int layers 					= 32;//64;//
-	int imagesPerCV 			= 10;
+	int layers 					= 64;//32;//
+
 	float occlusionThreshold 	= .05;
 	int startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
@@ -112,10 +114,11 @@ int main()
 
 	cout << "\n main_chk 4\n" << flush;
 	cout << "calculate cost volume: ================================================" << endl << flush;
-	for (int imageNum = 0; imageNum < 11; imageNum+=1){                              // Update CostVol ////////////////
+	for (int imageNum = 0; imageNum < imagesPerCV; imageNum+=1){                              // Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
 	}
+	cv.cvrc.saveCostVols();
 
 	cout << "\n main_chk 5\n" << flush;
 	cout << "cacheGValues: =========================================================" << endl;
@@ -135,7 +138,7 @@ int main()
 		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
 		//doneOptimizing = true; // debug single loop TODO remove this line.
 		opt_count ++;
-	} while (!doneOptimizing && (opt_count<4));
+	} while (!doneOptimizing );//&& (opt_count<4));
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;

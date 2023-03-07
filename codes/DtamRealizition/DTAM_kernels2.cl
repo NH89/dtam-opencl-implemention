@@ -45,20 +45,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	// Get keyframe pixel values
 	int offset_3 = global_id *3;
 	float3 B;	B.x = base[offset_3]; B.y = base[offset_3]; B.z = base[offset_3];	// pixel from keyframe
-/*
-	// camera params // could use float3 if fx=fy
-	const float fx = k[0];
-	const float fy = k[0];
-	const float cx = k[1];
-	const float cy = k[2];
 
-	// precalculate components // {a..l}={0..11} elem of rt[], 3D pose transform matrix.
-	float fd_cx = fx*rt[3]/cx;
-	float fh_cy = fy*rt[7]/cy;
-
-	float u2_a = (rt[0]*u + rt[1]*v + rt[2]*fx)/cx;
-	float v2_e = (rt[4]*v + rt[5]*v + rt[6]*fy)/cy;
-*/
 	// variables for the cost vol
 	float u2,v2, inv_depth=0.0;
 	int int_u2, int_v2, cv_idx = global_id;
@@ -72,56 +59,6 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	// layer zero, ////////////////////////////////////////////////////////////////////////////////////////
 	// inf depth, roation without paralax, i.e. reproj without translation.
 	// Use depth=1 unit sphere, with rotational-preprojection matrix
-	/*
-	float xi = r[0] * u  + r[1] * v  + r[2]  + r[3];
-	float yi = r[4] * u  + r[5] * v  + r[6]  + r[7];
-	float wi = r[8] * u  + r[9] * v  + r[10] + r[11];
-	*/
-
-	/*
-	u2 = xi/wi;
-	v2 = yi/wi;
-	//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth);
-
-	int_u2 = ceil(u2);
-	int_v2 = ceil(v2);
-
-	if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { ;}				// if (not within new frame) skip ahead...
-	else{
-		// compute adjacent pixel indices
-		coff_11 =  int_v2    * cols +  int_u2;
-		coff_10 = (int_v2-1) * cols +  int_u2;
-		coff_01 =  int_v2    * cols + (int_u2 -1);
-		coff_00 = (int_v2-1) * cols + (int_u2 -1);
-
-		// sample adjacent pixels
-		c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
-		c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
-		c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
-		c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
-
-		// weighting for bi-linear interpolation
-		float factor_x = fmod(u2,1);
-		float factor_y = fmod(v2,1);
-		c = factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // float3, bi-linear interpolation
-
-		// Compute photometric cost															// divide rho by 256 to move from char to float value range.
-		rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/256.0;						// L1 norm between keyframe & new frame pixels.
-		if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
-			ns = (c0*w + rho) / (w + 1);					// c0 = existing value in this costvol elem.
-			cdata[cv_idx] = c.x + c.y + c.z; //ns;					// Costdata, same location c0 was read from.  // CostVol set here ###########
-			hdata[cv_idx] = rho; //w + 1;							// Weightdata, counts updates of this costvol element.
-		}else{
-			ns = c0;										// no update if new pixel is black.
-		}
-		if (ns < minv) { 									// find idx & value of min cost in this ray of cost vol, given this update.
-			minv = ns;
-			mini = layer;
-		}
-		maxv = fmax(ns, maxv);
-	}
-	////////////////////////////////////////////////////////////////////////////// // non-zero inv-depth layers
-    */
 
 	// precalculate depth-independent part of reprojection, h=homogeneous coords.
 	float uh2 = k2k[0]*u + k2k[1]*v + k2k[2]*1;  // +k2k[3]/z
@@ -129,99 +66,86 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float wh2 = k2k[8]*u + k2k[9]*v + k2k[10]*1; // +k2k[11]/z
 	//float h/z  = k2k[12]*u + k2k[13]*v + k2k[14]*1; // +k2k[15]/z
 
-	/*
-	xi = p[0] * u  + p[1] * v  + p[3];
-	yi = p[4] * u  + p[5] * v  + p[7];
-	wi = p[8] * u  + p[9] * v  + p[11];
-	*/
-
 	// Inverse depth step
-	float min_d = 500.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
+	float min_d = 1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
+	float max_d = 4500.0;
 	float max_inv_d = 1/min_d;
-	float inv_d_step = max_inv_d/(layers -1);
+	float min_inv_d = 1/max_d;
+	float inv_d_step = (max_inv_d - min_inv_d)/(layers -1);
 
 	// cost volume loop  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	#define MAX_LAYERS 64
+	float cost[MAX_LAYERS];
 	for( layer=0;  layer<layers; layer++ ){
 		cv_idx = global_id + layer*layerStep;
-		c0 = cdata[cv_idx];	// cost for this elem of cost vol
+		/*c0*/ cost[layer] = cdata[cv_idx];	// cost for this elem of cost vol
 		w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
 
 		// locate pixel to sample from  new image. Depth dependent part.
-		inv_depth = layer * inv_d_step;
+		inv_depth = (layer * inv_d_step) + min_inv_d;
 		uh2  = uh2 + k2k[3]*inv_depth;
 		vh2  = vh2 + k2k[7]*inv_depth;
 		wh2  = wh2 + k2k[11]*inv_depth;
 		u2   = uh2/wh2;
 		v2   = vh2/wh2;
 
-		//u2 = (xi + p[2]/inv_depth)/(wi + p[10]/inv_depth); // complete depth-dependent part, sum parts, dehomgenize result
-		//v2 = (yi + p[6]/inv_depth)/(wi + p[10]/inv_depth);
 		int_u2 = ceil(u2);
 		int_v2 = ceil(v2);
 
 		//if (global_id%10023==0) printf("\n%i,%u(%u,%u,\t %f,\t %f)\t\t %f,\t %f,\t %f",layer,global_id, int_u2, int_v2, u2,v2,  u2_a, fd_cx, inv_depth); // u2 and v2 too small
-		if ( (int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2) ) { continue;} 	// if (not within new frame) skip iteration
+		if ( !((int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2)) ) {  	// if (not within new frame) skip
 
-		// compute adjacent pixel indices
-		coff_11 =  int_v2    * cols +  int_u2;
-		coff_10 = (int_v2-1) * cols +  int_u2;
-		coff_01 =  int_v2    * cols + (int_u2 -1);
-		coff_00 = (int_v2-1) * cols + (int_u2 -1);
-		if (coff_11 > 307200*3) continue; 					// sampled pixel outside of image. TODO check the effect on DTAM's logic of pixels outside the image.
+			// compute adjacent pixel indices
+			coff_11 =  int_v2    * cols +  int_u2;
+			coff_10 = (int_v2-1) * cols +  int_u2;
+			coff_01 =  int_v2    * cols + (int_u2 -1);
+			coff_00 = (int_v2-1) * cols + (int_u2 -1);
 
-		// sample adjacent pixels
-		c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
-		c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
-		c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
-		c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
+			if (coff_11 <= 307200*3) {// sampled pixel inside of image. TODO check the effect on DTAM's logic of pixels outside the image.
+				// sample adjacent pixels
+				c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
+				c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
+				c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
+				c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
 
-		// weighting for bi-linear interpolation
-		float factor_x = fmod(u2,1);
-		float factor_y = fmod(v2,1);
-		c = factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // float3, bi-linear interpolation
+				// weighting for bi-linear interpolation
+				float factor_x = fmod(u2,1);
+				float factor_y = fmod(v2,1);
+				c = factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // float3, bi-linear interpolation
 
-		// Compute photometric cost															// divide rho by 256 to move from char to float value range.
-		rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/(3.0*256.0);	//					// L1 norm between keyframe & new frame pixels.
-		if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
-			ns = (c0*w + rho) / (w + 1);					// c0 = existing value in this costvol elem.
-			cdata[cv_idx] = ns;//rho;//c.x + c.y + c.z; //					// Costdata, same location c0 was read from.  // CostVol set here ###########
-			hdata[cv_idx] = w + 1;//B.x + B.y+ B.z; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
-		}else{
-			ns = c0;										// no update if new pixel is black.
-		}
-		if (ns < minv) { 									// find idx & value of min cost in this ray of cost vol, given this update.
-			minv = ns;
-			mini = layer;
-		}
-		maxv = fmax(ns, maxv);
-
-		// Print out data at one pixel, at each layer:
-		if(u==171 && v==302){  // (u==407 && v==60) corner of picture,  (u==300 && v==121) centre of monitor, (u==171 && v==302) on the desk .
-			float d;
-			if (inv_depth==0){d=0;}
-			else {d=1/inv_depth;}
-			printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f), c0=%f, w=%f, ns=%f, rho=%f, minv=%f, mini=%f", \
-			layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11], c0, w, ns, rho, minv, mini);
+				// Compute photometric cost															// divide rho by 256 to move from char to float value range.
+				rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/(3.0*256.0);	//					// L1 norm between keyframe & new frame pixels.
+				if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
+					cost[layer] = (cost[layer]*w + rho) / (w + 1);					// cost[layer] = existing value in this costvol elem.
+					cdata[cv_idx] = cost[layer];//rho;//c.x + c.y + c.z; //					// Costdata, same location cost[layer] was read from.  // CostVol set here ###########
+					hdata[cv_idx] = w + 1;//B.x + B.y+ B.z; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
+				}
+			}
 		}
 	}
+	for( layer=0;  layer<layers; layer++ ){
+		if (cost[layer] < minv) { 									// find idx & value of min cost in this ray of cost vol, given this update. NB Use array private to this thread.
+			minv = cost[layer];
+			mini = layer;
+		}
+		maxv = fmax(cost[layer], maxv);
+	}
+	// Print out data at one pixel, at each layer:
+	if(u==70 && v==470){  // (u==407 && v==60) corner of picture,  (u==300 && v==121) centre of monitor, (u==171 && v==302) on the desk, (470, 70) out of frame in later images
+		float d;
+		if (inv_depth==0){d=0;}
+		else {d=1/inv_depth;}
+		printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f), c0=%f, w=%f, ns=%f, rho=%f, minv=%f, mini=%f", \
+		layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11], c0, w, ns, rho, minv, mini);
+	}
+
 	lo[global_id] 	= minv; 			// min photometric cost  // rho;//
 	a[global_id] 	= mini;// c.x + c.y + c.z; //mini*inv_d_step; 	// inverse distance      //  int_u2;//
-	d[global_id] 	= ns;   			// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?   // int_v2;//
+	d[global_id] 	= mini;//ns;   			// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?   // int_v2;//
 	hi[global_id] 	= maxv; 			// max photometric cost
 
 	// refinement step - from DTAM Mapping
-	/*
-	Cmin[i]	   = Cost_min;
-	CminIdx[i] = far + float(minl)*depthStep;// inverse depth which minimize photomeric error
-	Cmax[i]	   = Cost_max;
-	if(minl == 0 || minl == layers-1) return;// first or last inverse depth was best
-	const float A = Cost[i+(minl-1)*layerStep];
-	const float B = Cost_min;
-	const float C = Cost[i+(minl+1)*layerStep];
-	float delta = ((A+C)==2*B)? 0.0f : ((C-A)*depthStep)/(2*(A-2*B+C));
-	delta = (fabsf(delta) > depthStep)? 0.0f : delta;// if the gradient descent step is less than one whole inverse depth interval, reject interpolation
-	CminIdx[i] += delta;
-	*/
+
 	if(mini == 0 || mini == layers-1) return;// first or last inverse depth was best
 	const float A_ = cdata[(int)(global_id + (mini-1)*layerStep)]  ;//Cost[i+(minl-1)*layerStep];
 	const float B_ = minv;
@@ -232,111 +156,6 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 																			// NB CminIdx used to initialize A & D
 }
 
-
-/*
-
-__kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
-	//__global float* p,		//0  kernelArg numbers
-
-	__global float* k2k,	//0
-	__global uchar* base,	//1
-	__global uchar* img,	//2
-	__global float* cdata,	//3
-	__global float* hdata,	//4 'w'
-	int layerStep,			//5 width*height
-	float weight,			//6
-	int cols,				//7
-	__global float* lo, 	//8
-	__global float* hi,		//9
-	__global float* a,		//10
-	__global float* d,		//11
-	int layers)				//12 layers=32
-{
-	int global_id = get_global_id(0);
-	int xf = global_id; 							// TODO either pass rows in kernel args, OR compile const values for rows, cols, layers, layerStep.
-	int yf = xf / (cols);
-	xf = xf % (cols);
-
-	int rows = layerStep/cols;
-	unsigned int offset_1 = xf + yf * cols; 			// i.e offset =
-	unsigned int offset_3 = offset_1 * 3;
-	float xf_1 = xf;
-	float yf_1 = yf;
-	float3 B;	B.x = base[offset_3];  B.y = base[offset_3];  B.z = base[offset_3];	// pixel from keyframe
-													// (wi,xi,yi)=homogeneous coords of keyframe _ray_. // Below old comments, meaning ??
-	float xi = k2k[0] * xf_1  + k2k[1] * yf_1  + k2k[3];	//  xi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];  // TODO rework for inv_depth and k2k using pixel=(u,v,1,1/z) !!!!!!
-	float yi = k2k[4] * xf_1  + k2k[5] * yf_1  + k2k[7];	//  yi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];
-	float wi = k2k[8] * xf_1  + k2k[9] * yf_1  + k2k[11];	//  wi = p[ ] * global_id + p[ ] * global_id/cols  + p[ ];
-
-	float minv = 1000.0, maxv = 0.0, mini = 0;
-	barrier(CLK_GLOBAL_MEM_FENCE);
-
-	unsigned int coff_11, coff_01, coff_10, coff_00;
-	float3  c, c_11, c_10, c_01, c_00;
-	float v1=0, v2=0, v3=0, del=0, ns=0;
-
-	for (unsigned int z = 0; z < layers; z++)  // for layers of cost vol...  TODO prefer inverse depth, better distribution of layer depths.
-	{
-		float c0 = cdata[offset_1 + z*layerStep];	// cost for this elem of cost vol
-		float w  = hdata[offset_1 + z*layerStep];	// weighting for this elem in hdata (weights). w = 001 initially
-													// (wiz,xiz,yiz)=homogeneous pixel coords in new frame of keyframe _point_.
-		float wiz = wi + k2k[10] * z;
-		float xiz = xi + k2k[2] * z;
-		float yiz = yi + k2k[6] * z;
-													// (nx,ny)= integer pixel coords of point in new frame
-		float nx = xiz / wiz;						// NB Need coords of 4 pixels around the projected point.
-		float ny = yiz / wiz;
-		if (ny<1 || nx<1 || ny >480 || nx>640) {ny=1; nx=1;} // test for out_of_image
-
-		int nx_ = ceil(nx);
-		int ny_ = ceil(ny);
-
-		coff_11 = (ny_ * cols) + nx_;				// offset of pixel in new frame. TODO interpolated sample of pixel.
-		coff_10 = (ny_-1) * cols + nx_;
-		coff_01 = ny_     * cols + (nx_ -1);
-		coff_00 = (ny_-1) * cols + (nx_ -1);
-		if (coff_11 > 307200*3) continue; 			// sampled pixel outside of image. TODO check the effect on DTAM's logic of pixels outside the image.
-
-		c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
-		c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
-		c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
-		c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
-
-		float factor_x = fmod(nx,1);
-		float factor_y = fmod(ny,1);
-		c =  factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // bi-linear interpolation
-
-		float thresh = weight;						// occlusionThreshold set at 0.05 by default in main().
-
-		v1 = fabs(c.x - B.x);						// rgb photometric cost: bi-linear.
-		v2 = fabs(c.y - B.y);
-		v3 = fabs(c.z - B.z);																// TODO is applying norm here premature ? Does it degrade naive depthmap ?
-		del = v1 + v2 + v3;							// L1 norm between keyframe & new frame pixels.
-		//del = fmin(del/10000, thresh)*3.0f / thresh;		// if(del>0.05) del=3.0, else del=del*60  //  60=3/0.05 //  0.0<=del<=3.0
-													// NB divide del by 256 to move from char to float value range.
-		if (c.x + c.y + c.z != 0)		{ 			// If new image pixel is NOT black, (i.e. null, out of frame)
-			ns = (c0*w + del) / (w + 1);			// c0 = existing value in this costvol elem.
-			cdata[offset_1 + z*layerStep] = ns;		// Costdata, same location c0 was read from.  // CostVol set here ###########
-			hdata[offset_1 + z*layerStep] = w + 1;	// Weightdata, same location w  was read from. Counts how many times this ray
-		}else{
-			ns = c0;
-		}
-		if (ns < minv) { 							// logging intermediate data
-			minv = ns;
-			mini = z;
-		}
-		maxv = fmax(ns, maxv);
-	}
-	// NB All of these are for logging intermediate data for diagnostics.
-	// a[offset_1] = mini; records the naive depthmap.
-	// d[offset_1] = ns;  records cost at the naive depthmap
-	lo[global_id] 	= minv;//base[offset_3];// base[offset_3];//.x;  // export the images as accessed by the kernel.
-	a[offset_1] 	= mini;//v1;//
-	d[offset_1] 	= ns;//v2;//
-	hi[offset_1] 	= maxv;//c_11.x;//v3;//del;//maxv;//img[coff_11*3];  //  export the images as accessed by the kernel.
-}// # currently all c.x = 0, ie all pixels are out of the keyframe, even for the first image
-
-*/
 
 /*
  __kernel void CacheG1(__global float* base, __global float* g1p, int cols, int rows)                        // called as "cache1_kernel" in RunCL.cpp
@@ -410,19 +229,6 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
  }
  */
 
-/*
-  void fsetPositive(float *fpnum)								// Uses bitwise "inclusive OR"  // does NOT WORK
- {
-	 const int positive_zero_int = 0; 							// by ISO C-11 standard, sign-bit=1, followed by 31 zeroes.
-	 //float fptemp = *fpnum;
-	 //int   intemp = ((int)fptemp);
-	 //intemp = ((int)fptemp) | positive_zero_int;
-	 *fpnum = (float)(((int)*fpnum) | positive_zero_int);		// by ISO C-11 standard, sign-bit=1, followed 8 expoment bits, then 23 mantissa bits.
-
-	 //  *fpnum | (float)0.0; // does this work ?
- }
-*/
-
 
  __kernel void CacheG3(__global float* base, /*__global float* g1p,*/ __global float* gxp, __global float* gyp, int cols, int rows) //, float beta// new version
  {
@@ -448,8 +254,8 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 pd =  base[offset + dnoff];// + base[offset + 2*dnoff];
 
 	 float g;
-	 float alphaG = 0.4;  // from icl_nuim.json, // 0.4 to 0.015
-	 float betaG = 1.0;		// 1 to 1.5
+	 //float alphaG = 0.4;  // from icl_nuim.json, // 0.4 to 0.015
+	 //float betaG = 1.0;		// 1 to 1.5
 
 	 g = fabs(pr - pl); // ## TODO why is "if(g>64)" needed ? & why this value ? better solutions ?
 	 /*if (g>64) gxp[offset] = 0.0; else*/
@@ -461,38 +267,7 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 
 	 // exp(-alphaG * pow(sqrt(gx*gx + gy*gy), betaG) );
 
-	 /*
-	 // Huber norm of image gradient, in eq (5).
-	 float alpha = -1; 													// in DTAM<1000lines
-	 //float beta  = 0,001 // while theta>0.001, else beta = 0.0001 	// from the paper, vs beta=2 in DTAM<1000lines
-	 //float epsilon = 0.0001											// in DTAM<1000lines
-
-	 float huber_x = (g0x > beta)*(g0x*g0x/(2*beta)) + (g0x <= beta)*(fabs(g0x) - beta/2); // If weighting remains 2D, need to store direction: (g0x/fabs(g0x))
-	 float huber_y = (g0y > beta)*(g0y*g0y/(2*beta)) + (g0y <= beta)*(fabs(g0y) - beta/2); // Otherwise use the norm to merge the dimensions.
-
-	 gxp[offset] = exp(alpha * huber_x);
-	 gyp[offset] = exp(alpha * huber_y); // TODO (i) save these to a global variable, (ii) write host fn, and (iii) view images.
-
-	 g1p[offset] = (g0x/fabs(g0x)) * (g0y/fabs(g0y));	// +/-1, holds which diagonal the gradient aligns with.
-	 */
-	/*
-	 if (g>64 && offset%100==0){
-		 //float fpnum = (pd-pu);
-		 //fsetPositive(&fpnum);
-		 int temp = pd-pu;
-		 if(temp<0.0) temp *=-1;
-		 //const int pos_zero = 0;
-		 //temp = temp | pos_zero;
-		 //uint utemp1 = (uint)temp;
-		 //uint utemp2 = utemp1 <<1;
-		 //uint utemp3 = utemp2 >>1;
-		 //temp = (int)utemp3;
-		 printf("\nCacheG3: g=fabs(pd-pu)=%f, pd=%f, pu=%f, (pd-pu)=%f,  temp=%i ",//, ((pd-pu)|(float)0.0)=%f,  fsetPositive(float *fpnum)=%f",
-		 g, pd, pu, (pd-pu), temp);//,  (float)((int)(pd-pu)|(int)0.0),  fpnum );
-	 }
-	 */
  }
-
 
 
  __kernel void CacheG4( __global float* g1p, __global float* gxp, __global float* gyp, int cols, int rows, float beta)
@@ -516,8 +291,8 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 ///////////////////////
 	 // Adapted from DTAM_Mapping
 	 // DTAM paper Equation(5), $g(\mathbf{u}) = e^{-\alpha\|\nabla \mathbf{I_r(u)}\|_2^{\beta}}$
-	 float alphaG = 1.0;
-	 float betaG = 1.0;
+	 float alphaG = 0.015;//0.1;//0.4;//1.0;  // Now much better edges of image.
+	 float betaG = 1.5;//1.0;
 	 // g[i] = expf( -alphaG * powf(sqrtf(gx*gx + gy*gy), betaG) );
 	 // alphaG * pow(sqrt(gxp[offset]*gxp[offset] + gyp[offset]*gyp[offset]), betaG) ; // exp(   )
 	 float gx=gxp[offset];
@@ -543,31 +318,63 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 	 int cols,
 	 int rows)
  {
-	 int x = get_global_id(0);
-	 int y = x / cols;
-	 x = x % cols;
+	 int g_id = get_global_id(0);
+	 int y = g_id / cols;
+	 int x = g_id % cols;
 	 unsigned int pt = x + y * cols;               // index of this pixel
 	 barrier(CLK_GLOBAL_MEM_FENCE);
+	 const int wh = (cols*rows);
 
 	 float g1 = g1pt[pt];
-	 float q  = qpt[pt];
+	 float qx = qpt[pt];
+	 float qy = qpt[pt+wh];
 	 float d  = dpt[pt];
 	 float a  = apt[pt];
 
-	 float val 		= (q + sigma_q * g1 * d)/(1 + sigma_q * epsilon);
-	 float q_next 	= val/fmax((float)1.0,(float)fabs(val));
-	 float d_next 	= (d + sigma_d*((g1*q_next) + (a/theta)))/(1 + (sigma_d/theta));
+	 //
+	 const float dd_x = (x==cols-1)? 0.0f : dpt[pt+1]    - d;			// Sample depth gradient in x&y
+	 const float dd_y = (y==rows-1)? 0.0f : dpt[pt+cols] - d;
+	 // DTAM paper, primal-dual update step
 
-	 qpt[pt] = q_next;
-	 dpt[pt] = d_next;
+	 qx = (qx + sigma_q*g1*dd_x) / (1.0f + sigma_q*epsilon);
+	 qy = (qy + sigma_q*g1*dd_y) / (1.0f + sigma_q*epsilon);
+	 const float maxq = fmax(1.0f, sqrt(qx*qx + qy*qy));
+
+	 //unsigned int pt2 = pt+wh;
+	 qx = qx/maxq;
+	 qy = qy/maxq;
+	 qpt[pt]    = qx;//dd_x;//pt2;//wh;//pt;//dd_x;//qx / maxq;
+	 qpt[pt+wh] = qy;//dd_y;//pt;//;//y;//dd_y;//dpt[pt+1] - d; //dd_y;//qy / maxq;
+	 //
+	/*
+	 float div_q_x(const float *q, int w, int x, int i) {
+		if (x == 0) return q[i];
+		else if (x == w-1) return -q[i-1];
+		else return q[i]- q[i-1];
+	 }
+	 float div_q_y(const float *q, int w, int h, int wh, int y, int i) {
+		if (y == 0) return q[i+wh];// return q[i];
+		else if (y == h-1) return -q[i+wh-w];// return -q[i-1];
+		else return q[i+wh] - q[i+wh-w];// return q[i]- q[i-w];
+	 }
+	 */
+	 // needs to be after all Q updates.
+	 barrier(CLK_GLOBAL_MEM_FENCE);
+	 float dqx_x;// = div_q_x(q, w, x, i);											// div_q_x(..)
+	 if (x == 0) dqx_x = qx;
+	 else if (x == cols-1) dqx_x =  -qpt[pt-1];
+	 else dqx_x =  qx- qpt[pt];
+
+	 float dqy_y;// = div_q_y(q, w, h, wh, y, i);										// div_q_y(..)
+	 if (y == 0) dqy_y =  qy;						// return q[i];
+	 else if (y == rows-1) dqy_y = -qpt[pt+wh-cols];	// return -q[i-1];
+	 else dqy_y =  qy - qpt[pt+wh-cols];			// return q[i]- q[i-w];
+
+	 const float div_q = dqx_x + dqy_y;
+
+	 dpt[pt]  = (d + sigma_d*(g1*div_q + a/theta)) / (1.0f + sigma_d/theta);
  }
 
- /*
- float E_aux(float a_, float d, float lambda, float theta, unsigned int pt, int layer_step, __global float* cdata)
- {
-	 return ((d-a_)*(d-a_)/(2*theta)) + lambda*cdata[pt + layer_step*(int)a_];	// Eq 14 from DTAM paper.
- }
-*/
 
  __kernel void UpdateA2(  // pointwise exhaustive search
 	__global float* cdata,                         //           cost volume
@@ -614,8 +421,6 @@ __kernel void BuildCostVolume(								// called as "cost_kernel" in RunCL.cpp
 
 	 float grad_E = (E1-E3);				// /2
 	 float div_E  = (E1 -2*E2 + E3);		// /4
-
-	 // && (a - 2*grad_E/div_E)!=nan
 
 	 if (div_E != 0 ){
 		apt[pt] = a - 2*grad_E/div_E ; // TODO problem getting -ve values !
