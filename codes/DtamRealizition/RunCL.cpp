@@ -806,8 +806,8 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 	ss << this_count;
 	cv::Size q_size( baseImage_size.width, 2* baseImage_size.height ); // double sized for qx and qy.
 
-	//DownloadAndSave(qmem,   ss.str(), paths.at("qmem"),    2*width * height * sizeof(float), q_size        , CV_32FC1, /*show=*/ false , 1);// 64);//2*640*480);//
-	//DownloadAndSave(dmem,   ss.str(), paths.at("dmem"),    width * height * sizeof(float)  , baseImage_size, CV_32FC1, /*show=*/ false , 64);
+	DownloadAndSave(qmem,   ss.str(), paths.at("qmem"),    2*width * height * sizeof(float), q_size        , CV_32FC1, /*show=*/ false , 1);// 64);//2*640*480);//
+	DownloadAndSave(dmem,   ss.str(), paths.at("dmem"),    width * height * sizeof(float)  , baseImage_size, CV_32FC1, /*show=*/ false , 64);
 	clFlush(m_queue);
 	clFinish(m_queue);
 	cout<<"\nRunCL::updateQD_chk3_finished\n"<<flush;
@@ -824,11 +824,17 @@ void RunCL::updateA(int layers, float lambda,float theta)
 	res = clSetKernelArg(updateA_kernel, 0, sizeof(cl_mem), &cdatabuf); if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateA_kernel, 1, sizeof(cl_mem), &amem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateA_kernel, 2, sizeof(cl_mem), &dmem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateA_kernel, 3, sizeof(int),    &layers);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateA_kernel, 4, sizeof(int),    &width);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateA_kernel, 5, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateA_kernel, 6, sizeof(float),  &lambda);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	res = clSetKernelArg(updateA_kernel, 7, sizeof(float),  &theta);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	res = clSetKernelArg(updateA_kernel, 3, sizeof(cl_mem), &lomem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	res = clSetKernelArg(updateA_kernel, 4, sizeof(cl_mem), &himem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+
+	//res = clSetKernelArg(cost_kernel, 8, sizeof(cl_mem),  &lomem);		if(res!=CL_SUCCESS){cout<<"\nlomem res = "    <<checkerror(res)<<"\n"<<flush;exit_(res);} // lo
+	//res = clSetKernelArg(cost_kernel, 9, sizeof(cl_mem),  &himem);		if(res!=CL_SUCCESS){cout<<"\nhimem res = "    <<checkerror(res)<<"\n"<<flush;exit_(res);} // hi
+
+	res = clSetKernelArg(updateA_kernel, 5, sizeof(int),    &layers);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	res = clSetKernelArg(updateA_kernel, 6, sizeof(int),    &width);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	res = clSetKernelArg(updateA_kernel, 7, sizeof(int),    &height);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	res = clSetKernelArg(updateA_kernel, 8, sizeof(float),  &lambda);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	res = clSetKernelArg(updateA_kernel, 9, sizeof(float),  &theta);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 	status = clFinish(m_queue); 			if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="<<status<<" "<<checkerror(status)<<"\n"<<flush; exit_(status);}
 
@@ -842,7 +848,7 @@ void RunCL::updateA(int layers, float lambda,float theta)
 	count = keyFrameCount*1000000 + Acount*1000 + 999;
 	Acount++;
 	if(Acount%1==0){
-		ss << count;
+		ss << count << "_theta"<<theta<<"_";;
 		cv::Size q_size( baseImage_size.width, 2* baseImage_size.height ); // double sized for qx and qy.
 		//DownloadAndSaveVolume(cdatabuf, ss.str(), paths.at("cdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
 		DownloadAndSave(amem,   ss.str(), paths.at("amem"),    width * height * sizeof(float), baseImage_size, CV_32FC1,  false , 64);

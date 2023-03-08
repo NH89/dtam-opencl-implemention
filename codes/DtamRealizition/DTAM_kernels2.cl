@@ -358,7 +358,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		else return q[i+wh] - q[i+wh-w];// return q[i]- q[i-w];
 	 }
 	 */
-	 // needs to be after all Q updates.
+	 // needs to be after all Q updates. TODO ? is this fence sufficient ?
 	 barrier(CLK_GLOBAL_MEM_FENCE);
 	 float dqx_x;// = div_q_x(q, w, x, i);											// div_q_x(..)
 	 if (x == 0) dqx_x = qx;
@@ -376,16 +376,52 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
  }
 
 
+int set_start_layer(float di, float r, float far, float depthStep, int layers){
+    const float d_start = di - r;
+    const int start_layer = floor((d_start - far)/depthStep) - 1;
+    return (start_layer<0)? 0 : start_layer;// start_layer >= 0
+}
+
+int set_end_layer(float di, float r, float far, float depthStep, int layers){
+    const float d_end = di + r;
+    const int end_layer = ceil((d_end - far)/depthStep) + 1;          // lrintf = Round input to nearest integer value
+    // int end_layer = 255;// int layer = int((d_end - far)/depthStep) + 1;
+    return  (end_layer>(layers-1))? (layers-1) : end_layer;// end_layer <= layers-1
+}
+
+float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, float lambda, float scale_Eaux, float costval)
+{
+	const float ai = far + aIdx*depthStep;
+	return scale_Eaux*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
+
+	// return (0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
+	// return 100*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
+	// return 10000*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
+	// return 1000000*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
+	// return 10000000*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
+}
+
+
  __kernel void UpdateA2(  // pointwise exhaustive search
 	__global float* cdata,                         //           cost volume
 	__global float* apt,                           // dmem,     depth D
 	__global float* dpt,                           // amem,     auxilliary A
+	__global float* hi,
+	__global float* lo,
 	int layers,
 	int cols,
 	int rows,
 	float lambda,
 	float theta)
- {
+ {									// TODO  move all params to a parameters buffer, and autocalibrate. NB req coarse to fine warping.
+	float min_d 		= 1.0/1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
+	float max_d 		= 1.0/4500.0;
+	float scale_Eaux 	= 1;//10000;
+	float lambda_ 		= 1.0; 			// from DMAT_Mapping icl_nuim.json
+	//float far,
+	//float near,
+	//float scale_Eaux //)  // comes from json file for the dataset, (see DTAM_Mapping/input/json). "scale_Eaux" : 10000, for icl dataset.
+
 	 int x = get_global_id(0);
 	 int y = x / cols;
 	 x = x % cols;
@@ -402,15 +438,56 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 float min_val     = FLT_MAX;
 	 int   min_layer   = 0;
 
-	 for (int layer=1; layer<(layers-1); layer++, cpt+=layer_step){
-		 E_a = ((d-a)*(d-a)/(2*theta)) + lambda*cdata[cpt];  								// Eq 14 from DTAM paper.
+	 ///////////
+	 /*
+	 const float depthStep = (min_d - max_d) / (layers - 1);
+	 const int layerStep = rows*cols;
+	 const float d = dpt[pt];
+
+	 const float r = 2*theta*lambda*(hi[pt] - lo[pt]);
+	 const int start_layer = set_start_layer(d, r, max_d, depthStep, layers);
+	 const int end_layer   = set_end_layer(d, r, max_d, depthStep, layers);
+	 int minl = 0;
+	 float Eaux_min = 1e+30; // set high initial value
+
+	 for(int l = start_layer; l <= end_layer; l++) {
+		const float cost_total = get_Eaux(theta, d, (float)l, max_d, depthStep, lambda, scale_Eaux, cdata[pt+l*layerStep]);
+		apt[pt+l*layerStep] = cost_total;
+		if(cost_total < Eaux_min) {
+			Eaux_min = cost_total;
+			minl = l;
+		}
+	 }
+	*/
+	//float a = max_d + minl*depthStep;  // NB implicit conversion: int minl -> float.
+	/*  refinement step
+	if(minl > start_layer && minl < end_layer){ //return;// if(minl == 0 || minl == layers-1) // first or last was best
+		// sublayer sampling as the minimum of the parabola with the 2 points around (minl, Eaux_min)
+		const float A = get_Eaux(theta, d, minl-1, max_d, depthStep, lambda, scale_Eaux, cdata[pt+(minl-1)*layerStep]);
+		const float B = Eaux_min;
+		const float C = get_Eaux(theta, d, minl+1, max_d, depthStep, lambda, scale_Eaux, cdata[pt+(minl+1)*layerStep]);
+		// float delta = ((A+C)==2*B)? 0.0f : ((A-C)*depthStep)/(2*(A-2*B+C));
+		float delta = ((A+C)==2*B)? 0.0f : ((C-A)*depthStep)/(2*(A-2*B+C));
+		delta = (fabs(delta) > depthStep)? 0.0f : delta;
+		// a[i] += delta;
+		a -= delta;
+	}
+	*/
+	//apt[pt] = a;
+
+	 ///////////
+	//*
+	 for (int layer=1; layer<(layers-1); layer++, cpt+=layer_step){// here a & d hold cost vol layer idx. TODO change to using true inv depth ?
+		 E_a = ((d-layer)*(d-layer)/(2*theta)) + lambda_*cdata[cpt];  								// Eq 14 from DTAM paper.
+		 if (x==100 && y==100) printf("\nd=%f, layer=%i, cdata[cpt]=%f, E_a=%f, min_val=%f, min_layer=%i   ",d, layer, cdata[cpt], E_a, min_val, min_layer  );
 		 if (E_a<min_val){
 			 min_val   = E_a;
 			 min_layer = layer;
 		 }
 	 }
 	 a = min_layer;
-
+	 apt[pt] = a;
+	 /*
 	 // Eq 18 from DTAM paper, subsample refinement. Consider gradient & curvature wrt adjacent depth levels.
 	 // (Otherwise use minimum of parabola through adjacent depth samples of the cost volume.)
 
@@ -426,7 +503,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		apt[pt] = a - 2*grad_E/div_E ; // TODO problem getting -ve values !
 	 }else {
 		apt[pt] = a;
-	}
+	 }
+	*/
  }
 
 /*
@@ -514,6 +592,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
  }
 */
 
+/*
  float afunc(float data, float theta, float d, float ds, int a, float lambda)                               // used in __kernel void UpdateA(...) below
  {
 	 return 1.0 / (2.0*theta)*ds*ds*(d - a)*(d - a) + data * lambda;                     // Eq(14) from the DTAM paper. ds= depthStep= 1.0f / layers
@@ -583,7 +662,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
  }
 
 
- __kernel void InitializeAD(
+ __kernel void InitializeAD(															// not currently used
 	 __global float* cdata,                                                               // called as "InitializeAD_kernel" in RunCL.cpp
 	 __global float* a,
 	 __global float* d,
@@ -607,3 +686,4 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 a[global_id_]=layer_;
 	 d[global_id_]=layer_;
  }
+*/
