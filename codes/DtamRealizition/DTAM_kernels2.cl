@@ -29,8 +29,13 @@
 #define sigma_d_		11
 #define theta_			12
 #define lambda_			13	///   __kernel void UpdateA2
-
-
+#define scale_Eaux_		14
+/*
+	float min_d 		= 1.0/1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
+	float max_d 		= 1.0/4500.0;
+	float scale_Eaux 	= 1;//10000;
+	float lambda_ 		= 1.0; 			// from DMAT_Mapping icl_nuim.json
+*/
 __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 // TODO rewrite with homogeneuos coords to handle points at infinity (x,y,z,0) -> (u,v,0)
 	/*						// kernelArg numbers
@@ -489,27 +494,38 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	float theta
 	 */
 )
- {									// TODO  move all params to a parameters buffer, and autocalibrate. NB req coarse to fine warping.
+ {
+	/*
+	 * // TODO  move all params to a parameters buffer, and autocalibrate. NB req coarse to fine warping.
 	float min_d 		= 1.0/1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
 	float max_d 		= 1.0/4500.0;
 	float scale_Eaux 	= 1;//10000;
 	float lambda_ 		= 1.0; 			// from DMAT_Mapping icl_nuim.json
+	*//*
 	//float far,
 	//float near,
 	//float scale_Eaux //)  // comes from json file for the dataset, (see DTAM_Mapping/input/json). "scale_Eaux" : 10000, for icl dataset.
-
+	*/
 	 int x = get_global_id(0);
 	 int rows 			= floor(params[rows_]);
 	 int cols 			= floor(params[cols_]);
 	 int layers			= floor(params[layers_]);
 
+	 unsigned int layer_step = floor(params[pixels_]);
+
+	 float lambda		= params[lambda_];
+	 float theta		= params[theta_];
+
+	// float min_d		= params[layers_];
+	// float max_d		= params[layers_];
+	 float scale_Eaux	= params[scale_Eaux_];
 
 	 int y = x / cols;
 	 x = x % cols;
 	 unsigned int pt  = x + y * cols;               // index of this pixel
 	 if (pt >= (cols*rows))return;
 	 unsigned int cpt = pt;
-	 unsigned int layer_step = rows*cols;
+
 	 barrier(CLK_GLOBAL_MEM_FENCE);
 
 	 float d  	= dpt[pt];
