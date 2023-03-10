@@ -15,28 +15,56 @@
 //  res = clSetKernelArg(cost_kernel, 12, sizeof(int),      &layers);
 */
 
+#define pixels_			0  // Can these be #included from a common header for both host and device code?
+#define rows_			1
+#define cols_			2
+#define layers_			3
+#define max_inv_depth_	4
+#define min_inv_depth_	5
+#define inv_d_step_		6
+#define threshold_		7
+#define beta_			8	///  __kernel void CacheG4
+#define epsilon_		9	///  __kernel void UpdateQD		// epsilon = 0.1
+#define sigma_q_		10									// sigma_q = 0.0559017
+#define sigma_d_		11
+#define theta_			12
+#define lambda_			13	///   __kernel void UpdateA2
+
+
 __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 // TODO rewrite with homogeneuos coords to handle points at infinity (x,y,z,0) -> (u,v,0)
-							// kernelArg numbers
+	/*						// kernelArg numbers
 	//__global float* r,		//0 Rotation-only reprojection matrix for inf depth.
 	//__global float* p,		//1 Reprojection matrix
-
+	*/
 	__global float* k2k,	//0
 	__global float* base,	//1  // uchar*
 	__global float* img,	//2  // uchar*
 	__global float* cdata,	//3
-	__global float* hdata,	//4 'w' num times cost vol elem has been updated
-	int layerStep,			//5 width*height
-	float weight,			//6
-	int cols,				//7
-	__global float* lo, 	//8
-	__global float* hi,		//9
-	__global float* a,		//10
-	__global float* d,		//11
+	__global float* hdata,	//4  'w' num times cost vol elem has been updated
+	/*
+	//int layerStep,		//5 width*height
+	//float weight,			//6
+	//int cols,				//7
+	*/
+	__global float* lo, 	//5
+	__global float* hi,		//6
+	__global float* a,		//7
+	__global float* d,		//8
+	/*
 	int layers)				//12 layers=32
+	*/
+	__constant float* params) //9 pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step, threshold
 {
 	int global_id = get_global_id(0);
-	int rows = layerStep/cols;
+
+	int pixels 			= floor(params[pixels_]);
+	int rows 			= floor(params[rows_]);
+	int cols 			= floor(params[cols_]);
+	int layers			= floor(params[layers_]);
+	float max_inv_depth = params[max_inv_depth_];  // not used
+	float min_inv_depth = params[min_inv_depth_];
+	float inv_d_step 	= params[inv_d_step_];
 
 	// keyframe pixel coords
 	float u = global_id % cols;
@@ -65,24 +93,24 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float vh2 = k2k[4]*u + k2k[5]*v + k2k[6]*1;  // +k2k[7]/z
 	float wh2 = k2k[8]*u + k2k[9]*v + k2k[10]*1; // +k2k[11]/z
 	//float h/z  = k2k[12]*u + k2k[13]*v + k2k[14]*1; // +k2k[15]/z
-
+	/*
 	// Inverse depth step
-	float min_d = 1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
-	float max_d = 4500.0;
+	float min_d = params[min_depth];// 1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
+	float max_d = params[max_depth];// 4500.0;
 	float max_inv_d = 1/min_d;
 	float min_inv_d = 1/max_d;
-	float inv_d_step = (max_inv_d - min_inv_d)/(layers -1);
-
+	float inv_d_step = params[inv_d_step];// (max_inv_d - min_inv_d)/(params[layers] -1);
+	*/
 	// cost volume loop  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	#define MAX_LAYERS 64
 	float cost[MAX_LAYERS];
 	for( layer=0;  layer<layers; layer++ ){
-		cv_idx = global_id + layer*layerStep;
+		cv_idx = global_id + layer*pixels;
 		/*c0*/ cost[layer] = cdata[cv_idx];	// cost for this elem of cost vol
 		w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
 
 		// locate pixel to sample from  new image. Depth dependent part.
-		inv_depth = (layer * inv_d_step) + min_inv_d;
+		inv_depth = (layer * inv_d_step) + min_inv_depth;
 		uh2  = uh2 + k2k[3]*inv_depth;
 		vh2  = vh2 + k2k[7]*inv_depth;
 		wh2  = wh2 + k2k[11]*inv_depth;
@@ -116,8 +144,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 				// Compute photometric cost															// divide rho by 256 to move from char to float value range.
 				rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/(3.0*256.0);	//					// L1 norm between keyframe & new frame pixels.
 				if (c.x + c.y + c.z != 0.0)		{ 					// If new image pixel is NOT black, (i.e. null, out of frame ?)
-					cost[layer] = (cost[layer]*w + rho) / (w + 1);					// cost[layer] = existing value in this costvol elem.
-					cdata[cv_idx] = cost[layer];//rho;//c.x + c.y + c.z; //					// Costdata, same location cost[layer] was read from.  // CostVol set here ###########
+					cost[layer] = (cost[layer]*w + rho) / (w + 1);				// cost[layer] = existing value in this costvol elem.
+					cdata[cv_idx] = cost[layer];//rho;//c.x + c.y + c.z; //		// Costdata, same location cost[layer] was read from.  // CostVol set here ###########
 					hdata[cv_idx] = w + 1;//B.x + B.y+ B.z; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
 				}
 			}
@@ -130,30 +158,34 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		}
 		maxv = fmax(cost[layer], maxv);
 	}
+
 	// Print out data at one pixel, at each layer:
 	if(u==70 && v==470){  // (u==407 && v==60) corner of picture,  (u==300 && v==121) centre of monitor, (u==171 && v==302) on the desk, (470, 70) out of frame in later images
 		float d;
 		if (inv_depth==0){d=0;}
 		else {d=1/inv_depth;}
-		printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f), c0=%f, w=%f, ns=%f, rho=%f, minv=%f, mini=%f", \
-		layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11], c0, w, ns, rho, minv, mini);
+		printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f), c0=%f, w=%f, ns=%f, rho=%f, minv=%f, mini=%f, params[%i,%i,%i,%i,%f,%f,%f,]", \
+		layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11], c0, w, ns, rho, minv, mini,\
+			pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step
+		);
 	}
 
 	lo[global_id] 	= minv; 			// min photometric cost  // rho;//
-	a[global_id] 	= mini;// c.x + c.y + c.z; //mini*inv_d_step; 	// inverse distance      //  int_u2;//
-	d[global_id] 	= mini;//ns;   			// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?   // int_v2;//
+	a[global_id] 	= mini*inv_d_step + min_inv_depth;// c.x + c.y + c.z; //mini*inv_d_step; 	// inverse distance      //  int_u2;//
+	d[global_id] 	= mini*inv_d_step + min_inv_depth;//ns;   			// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?   // int_v2;//
 	hi[global_id] 	= maxv; 			// max photometric cost
 
 	// refinement step - from DTAM Mapping
 
 	if(mini == 0 || mini == layers-1) return;// first or last inverse depth was best
-	const float A_ = cdata[(int)(global_id + (mini-1)*layerStep)]  ;//Cost[i+(minl-1)*layerStep];
+	const float A_ = cdata[(int)(global_id + (mini-1)*pixels)]  ;//Cost[i+(minl-1)*layerStep];
 	const float B_ = minv;
-	const float C_ = cdata[(int)(global_id + (mini+1)*layerStep)]  ;//Cost[i+(minl+1)*layerStep];
+	const float C_ = cdata[(int)(global_id + (mini+1)*pixels)]  ;//Cost[i+(minl+1)*layerStep];
 	float delta = ((A_+C_)==2*B_)? 0.0f : ((C_-A_)*inv_d_step)/(2*(A_-2*B_+C_));
 	delta = (fabs(delta) > inv_d_step)? 0.0f : delta;// if the gradient descent step is less than one whole inverse depth interval, reject interpolation
 	a[global_id] += delta;																		// CminIdx[i] = .. ////
-																			// NB CminIdx used to initialize A & D
+	if ((global_id%1000 ==0) &&  (delta != 0.0)) printf("(%f,%f,%f),", mini*inv_d_step, delta, inv_d_step);										// NB CminIdx used to initialize A & D
+	// NB at present delta is too small!
 }
 
 
@@ -230,9 +262,22 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
  */
 
 
- __kernel void CacheG3(__global float* base, /*__global float* g1p,*/ __global float* gxp, __global float* gyp, int cols, int rows) //, float beta// new version
+ __kernel void CacheG3(
+	 __global float* base,
+	 /*__global float* g1p,*/
+	 __global float* gxp,
+	 __global float* gyp,
+	 __const float* params
+	 /*
+	 int cols,
+	 int rows
+	 */
+ ) //, float beta// new version
  {
 	 int x = get_global_id(0);
+	 int rows 				= floor(params[rows_]);
+	 int cols 				= floor(params[cols_]);
+
 	 int y = x / cols;
 	 x = x % cols;
 	 if (x<2 || x > cols-2 || y<2 || y>rows-2) return;  // needed for wider kernel
@@ -270,9 +315,23 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
  }
 
 
- __kernel void CacheG4( __global float* g1p, __global float* gxp, __global float* gyp, int cols, int rows, float beta)
+ __kernel void CacheG4(
+ __global float* g1p,
+ __global float* gxp,
+ __global float* gyp,
+ __const float* params
+ /*
+ int cols,
+ int rows,
+ float beta
+	 */
+)
  {
 	 int x = get_global_id(0);
+	 int rows 			= floor(params[rows_]);
+	 int cols 			= floor(params[cols_]);
+	 int beta 			= floor(params[beta_]);
+
 	 int y = x / cols;
 	 x = x % cols;
 	 if (x<2 || x > cols-2 || y<2 || y>rows-2) return; // needed for wider kernel
@@ -311,14 +370,24 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 __global float* qpt,
 	 __global float* dpt,                           // dmem,     depth D
 	 __global float* apt,                           // amem,     auxilliary A
+	 __const float* params
+	 /*
 	 float epsilon,									// epsilon = 0.1
 	 float sigma_q,									// sigma_q = 0.0559017
 	 float sigma_d,
 	 float theta,
 	 int cols,
-	 int rows)
+	 int rows
+ */)
  {
 	 int g_id = get_global_id(0);
+	 int rows 			= floor(params[rows_]);
+	 int cols 			= floor(params[cols_]);
+	 float epsilon 		= floor(params[epsilon_]);
+	 float sigma_q 		= floor(params[sigma_q_]);
+	 float sigma_d 		= floor(params[sigma_d_]);
+	 float theta 		= floor(params[theta_]);
+
 	 int y = g_id / cols;
 	 int x = g_id % cols;
 	 unsigned int pt = x + y * cols;               // index of this pixel
@@ -343,6 +412,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 //unsigned int pt2 = pt+wh;
 	 qx = qx/maxq;
 	 qy = qy/maxq;
+
 	 qpt[pt]    = qx;//dd_x;//pt2;//wh;//pt;//dd_x;//qx / maxq;
 	 qpt[pt+wh] = qy;//dd_y;//pt;//;//y;//dd_y;//dpt[pt+1] - d; //dd_y;//qy / maxq;
 	 //
@@ -363,7 +433,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 float dqx_x;// = div_q_x(q, w, x, i);											// div_q_x(..)
 	 if (x == 0) dqx_x = qx;
 	 else if (x == cols-1) dqx_x =  -qpt[pt-1];
-	 else dqx_x =  qx- qpt[pt];
+	 else dqx_x =  qx- qpt[pt-1];
 
 	 float dqy_y;// = div_q_y(q, w, h, wh, y, i);										// div_q_y(..)
 	 if (y == 0) dqy_y =  qy;						// return q[i];
@@ -372,7 +442,9 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 	 const float div_q = dqx_x + dqy_y;
 
-	 dpt[pt]  = (d + sigma_d*(g1*div_q + a/theta)) / (1.0f + sigma_d/theta);
+	 dpt[pt] = (d + sigma_d*(g1*div_q + a/theta)) / (1.0f + sigma_d/theta);
+	 //dpt[pt]   = sigma_d*(g1*div_q + a/theta); //div_q;
+	 if (x==100 && y==100) printf("\ndpt[pt]=%f, d=%f, sigma_d=%f, g1=%f, div_q=%f, a=%f, theta=%f, sigma_d=%f, theta=%f : qx=%f, qy=%f, maxq=%f, dd_x=%f, dd_y=%f ", dpt[pt], d, sigma_d, g1, div_q , a, theta, sigma_d, theta, qx, qy, maxq, dd_x, dd_y );
  }
 
 
@@ -408,11 +480,15 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	__global float* dpt,                           // amem,     auxilliary A
 	__global float* hi,
 	__global float* lo,
+	__const  float* params
+	/*
 	int layers,
 	int cols,
 	int rows,
 	float lambda,
-	float theta)
+	float theta
+	 */
+)
  {									// TODO  move all params to a parameters buffer, and autocalibrate. NB req coarse to fine warping.
 	float min_d 		= 1.0/1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
 	float max_d 		= 1.0/4500.0;
@@ -423,6 +499,11 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	//float scale_Eaux //)  // comes from json file for the dataset, (see DTAM_Mapping/input/json). "scale_Eaux" : 10000, for icl dataset.
 
 	 int x = get_global_id(0);
+	 int rows 			= floor(params[rows_]);
+	 int cols 			= floor(params[cols_]);
+	 int layers			= floor(params[layers_]);
+
+
 	 int y = x / cols;
 	 x = x % cols;
 	 unsigned int pt  = x + y * cols;               // index of this pixel

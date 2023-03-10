@@ -232,9 +232,6 @@ CostVol::CostVol(
 	}cout<<"\n";
 
 
-
-
-
 	/////////////////////////////////////////////////////////////////////////////
 
 	std::cout << "\n\nCostVol_chk 0\n" << std::flush;
@@ -252,8 +249,19 @@ CostVol::CostVol(
 	far    = _far;
     cout << "CostVol_chk 1.1\n" << flush;
 	depthStep    = (near - far) / (layers - 1);
+
+
+	float params[16] = {0};
+	params[PIXELS] 			= rows*cols;
+	params[ROWS] 			= rows;
+	params[COLS] 			= cols;
+	params[LAYERS] 			= layers;
+	params[MAX_INV_DEPTH] 	= near;
+	params[MIN_INV_DEPTH] 	= far;
+	params[INV_DEPTH_STEP] 	= (params[MAX_INV_DEPTH] - params[MIN_INV_DEPTH])/(params[LAYERS] -1);
+
 	cameraMatrix = _cameraMatrix.clone();
-    
+
 	// solve projection with
 	solveProjection(R, T);
     cout << "CostVol_chk 1.2\n" << flush;
@@ -279,7 +287,7 @@ CostVol::CostVol(
 	cvrc.height = rows;
 
 	cout << "CostVol_chk 2\n" <<flush;
-	cvrc.allocatemem( (float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data );
+	cvrc.allocatemem( (float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data, params);
 
 	cout << "CostVol_chk 3\n" << flush;
 	image.copyTo(baseImage);

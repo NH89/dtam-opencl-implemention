@@ -14,6 +14,16 @@ typedef size_t  st;
 #define gleft   gl[here]
 #define gright  gr[here]
 
+
+// indices for float params passed to __const params_buf
+#define PIXELS			0  // Can these be #included from a common header for both host and device code?
+#define ROWS			1
+#define COLS			2
+#define LAYERS			3
+#define MAX_INV_DEPTH	4
+#define MIN_INV_DEPTH	5
+#define INV_DEPTH_STEP	6
+
 class CostVol
 {
 public:

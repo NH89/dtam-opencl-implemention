@@ -33,11 +33,15 @@ public:
 	// cache1_kernel, cache2_kernel, updateQ_kernel, updateD_kernel, initializeAD_kernel,
 	cl_mem basemem, imgmem, cdatabuf, hdatabuf, k2kbuf, dmem, amem; // gdmem, gumem, glmem, grmem, qxmem, qymem, pbuf, kbuf, rtbuf,
 	cl_mem basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem;  // gqxmem, gqymem,
+	cl_mem param_buf;	//__constant float* params) // pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step, threshold
 	size_t  global_work_size, local_work_size;
 	bool gpu;
 	bool amdPlatform;     
 	cl_device_id deviceId;  
 	
+
+
+
 	int width, height, costVolLayers;
 	int count=0, keyFrameCount=0, costVolCount=0, QDcount=0, Acount=0;
 
@@ -204,7 +208,7 @@ public:
 		}
 	}
 	
-	void allocatemem(float *qx, float *qy, float* gx, float* gy);
+	void allocatemem(float *qx, float *qy, float* gx, float* gy, float* params);
 
 	void ReadOutput(uchar* outmat) {  // cvrc.ReadOutput(_a.data, dmem, image_size_bytes );
 		// DownloadAndSave(dmem, (keyFrameCount*1000 + costVolCount), paths.at("dmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ true );

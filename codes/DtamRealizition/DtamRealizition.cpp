@@ -96,6 +96,22 @@ int main()
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
 	int layers 					= 64;//32;//
+	float min_inv_depth = 1.0/4500.0;//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
+	float max_inv_depth = 1.0/1400.0;
+	/*
+	 * depth_min":1.0,
+		"depth_max":6.0,
+		"layers_" : 256,
+		"frames_per_reference_image" :20,
+		"similarity": "per_pixel",
+	 *//*
+	// Inverse depth step
+	float min_d = params[min_depth];// 1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
+	float max_d = params[max_depth];// 4500.0;
+	float max_inv_d = 1/min_d;
+	float min_inv_d = 1/max_d;
+	float inv_d_step = params[inv_d_step];// (max_inv_d - min_inv_d)/(params[layers] -1);
+	*/
 
 	float occlusionThreshold 	= .05;
 	int startAt 				= 0;
@@ -106,8 +122,9 @@ int main()
     images[startAt].convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
 	cv::imshow("Initial image main loop", temp );
 	*/
+
                                                                                    // Instantiate CostVol ///////////
-	CostVol cv(images[startAt], (FrameID)startAt, layers, 0.015, 0.0, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path);
+	CostVol cv(images[startAt], (FrameID)startAt, layers, max_inv_depth, min_inv_depth, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path);
 
 
 //	return 0; //#################### early halt #################################
@@ -138,7 +155,7 @@ int main()
 		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
 		//doneOptimizing = true; // debug single loop TODO remove this line.
 		opt_count ++;
-	} while (!doneOptimizing );//&& (opt_count<4));
+	} while (!doneOptimizing && (opt_count<4));  //  );//
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;

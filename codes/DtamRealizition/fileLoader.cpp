@@ -45,7 +45,7 @@ void loadAhanda(const char * rootpath,
     image.convertTo(temp, CV_8U);                              // NB need CV_U8 for imshow(..)
     cv::imshow("loadAhanda CV_32F", temp);
     */
-    cv::GaussianBlur(image, image, Size(3,3), 0, 0 );          // Gaussian blur to suppress image artefacts, that later affect photometric error.
+    cv::GaussianBlur(image, image, Size(9,9), 0, 0 );          // Gaussian blur to suppress image artefacts, that later affect photometric error.
     int r = image.rows;
     int c = image.cols;
     if(depth.size()>0){
