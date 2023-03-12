@@ -22,8 +22,8 @@
 #define max_inv_depth_	4
 #define min_inv_depth_	5
 #define inv_d_step_		6
-#define threshold_		7
-#define beta_			8	///  __kernel void CacheG4
+#define alpha_g_		7
+#define beta_g_			8	///  __kernel void CacheG4
 #define epsilon_		9	///  __kernel void UpdateQD		// epsilon = 0.1
 #define sigma_q_		10									// sigma_q = 0.0559017
 #define sigma_d_		11
@@ -272,7 +272,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 /*__global float* g1p,*/
 	 __global float* gxp,
 	 __global float* gyp,
-	 __const float* params
+	 __constant float* params
 	 /*
 	 int cols,
 	 int rows
@@ -324,7 +324,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
  __global float* g1p,
  __global float* gxp,
  __global float* gyp,
- __const float* params
+ __constant float* params
  /*
  int cols,
  int rows,
@@ -335,7 +335,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 int x = get_global_id(0);
 	 int rows 			= floor(params[rows_]);
 	 int cols 			= floor(params[cols_]);
-	 int beta 			= floor(params[beta_]);
+	 float alphaG		= params[alpha_g_];
+	 float betaG 		= params[beta_g_];
 
 	 int y = x / cols;
 	 x = x % cols;
@@ -355,8 +356,11 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 ///////////////////////
 	 // Adapted from DTAM_Mapping
 	 // DTAM paper Equation(5), $g(\mathbf{u}) = e^{-\alpha\|\nabla \mathbf{I_r(u)}\|_2^{\beta}}$
-	 float alphaG = 0.015;//0.1;//0.4;//1.0;  // Now much better edges of image.
-	 float betaG = 1.5;//1.0;
+
+	 //float alphaG = 0.015;//0.1;//0.4;//1.0;  // Now much better edges of image.
+	 //float betaG = 1.5;//1.0;
+
+
 	 // g[i] = expf( -alphaG * powf(sqrtf(gx*gx + gy*gy), betaG) );
 	 // alphaG * pow(sqrt(gxp[offset]*gxp[offset] + gyp[offset]*gyp[offset]), betaG) ; // exp(   )
 	 float gx=gxp[offset];
@@ -375,7 +379,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 __global float* qpt,
 	 __global float* dpt,                           // dmem,     depth D
 	 __global float* apt,                           // amem,     auxilliary A
-	 __const float* params
+	 __constant float* params
 	 /*
 	 float epsilon,									// epsilon = 0.1
 	 float sigma_q,									// sigma_q = 0.0559017
@@ -388,10 +392,10 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 int g_id = get_global_id(0);
 	 int rows 			= floor(params[rows_]);
 	 int cols 			= floor(params[cols_]);
-	 float epsilon 		= floor(params[epsilon_]);
-	 float sigma_q 		= floor(params[sigma_q_]);
-	 float sigma_d 		= floor(params[sigma_d_]);
-	 float theta 		= floor(params[theta_]);
+	 float epsilon 		= params[epsilon_];
+	 float sigma_q 		= params[sigma_q_];
+	 float sigma_d 		= params[sigma_d_];
+	 float theta 		= params[theta_];
 
 	 int y = g_id / cols;
 	 int x = g_id % cols;
@@ -418,8 +422,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 qx = qx/maxq;
 	 qy = qy/maxq;
 
-	 qpt[pt]    = qx;//dd_x;//pt2;//wh;//pt;//dd_x;//qx / maxq;
-	 qpt[pt+wh] = qy;//dd_y;//pt;//;//y;//dd_y;//dpt[pt+1] - d; //dd_y;//qy / maxq;
+	 qpt[pt]    = qx;  //dd_x;//pt2;//wh;//pt;//dd_x;//qx / maxq;
+	 qpt[pt+wh] = qy;  //dd_y;//pt;//;//y;//dd_y;//dpt[pt+1] - d; //dd_y;//qy / maxq;
 	 //
 	/*
 	 float div_q_x(const float *q, int w, int x, int i) {
@@ -485,7 +489,7 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	__global float* dpt,                           // amem,     auxilliary A
 	__global float* hi,
 	__global float* lo,
-	__const  float* params
+	__constant float* params
 	/*
 	int layers,
 	int cols,
@@ -516,8 +520,9 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 float lambda		= params[lambda_];
 	 float theta		= params[theta_];
 
-	// float min_d		= params[layers_];
-	// float max_d		= params[layers_];
+	 float min_d		= params[max_inv_depth_]; //far
+	 float max_d		= params[min_inv_depth_]; //near
+
 	 float scale_Eaux	= params[scale_Eaux_];
 
 	 int y = x / cols;
@@ -529,17 +534,17 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 barrier(CLK_GLOBAL_MEM_FENCE);
 
 	 float d  	= dpt[pt];
-	 float a  	= apt[pt];
+	 //float a  	= apt[pt];
 	 float E_a  = FLT_MAX;
 
 	 float min_val     = FLT_MAX;
 	 int   min_layer   = 0;
 
 	 ///////////
-	 /*
-	 const float depthStep = (min_d - max_d) / (layers - 1);
-	 const int layerStep = rows*cols;
-	 const float d = dpt[pt];
+	 //*
+	 const float depthStep = params[inv_d_step_]; //(min_d - max_d) / (layers - 1);
+	 const int   layerStep = rows*cols;
+	 //const float         d = dpt[pt];
 
 	 const float r = 2*theta*lambda*(hi[pt] - lo[pt]);
 	 const int start_layer = set_start_layer(d, r, max_d, depthStep, layers);
@@ -548,15 +553,15 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 float Eaux_min = 1e+30; // set high initial value
 
 	 for(int l = start_layer; l <= end_layer; l++) {
-		const float cost_total = get_Eaux(theta, d, (float)l, max_d, depthStep, lambda, scale_Eaux, cdata[pt+l*layerStep]);
-		apt[pt+l*layerStep] = cost_total;
+		const float cost_total = get_Eaux(theta, d, (float)l, min_d, depthStep, lambda, scale_Eaux, cdata[pt+l*layerStep]);
+		// apt[pt+l*layerStep] = cost_total;  // DTAM_Mapping collects an Eaux volume, for debugging.
 		if(cost_total < Eaux_min) {
 			Eaux_min = cost_total;
 			minl = l;
 		}
 	 }
-	*/
-	//float a = max_d + minl*depthStep;  // NB implicit conversion: int minl -> float.
+	//*/
+	float a = min_d + minl*depthStep;  // NB implicit conversion: int minl -> float.
 	/*  refinement step
 	if(minl > start_layer && minl < end_layer){ //return;// if(minl == 0 || minl == layers-1) // first or last was best
 		// sublayer sampling as the minimum of the parabola with the 2 points around (minl, Eaux_min)
@@ -570,10 +575,10 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 		a -= delta;
 	}
 	*/
-	//apt[pt] = a;
+	apt[pt] = a;
 
 	 ///////////
-	//*
+	/*
 	 for (int layer=1; layer<(layers-1); layer++, cpt+=layer_step){// here a & d hold cost vol layer idx. TODO change to using true inv depth ?
 		 E_a = ((d-layer)*(d-layer)/(2*theta)) + lambda_*cdata[cpt];  								// Eq 14 from DTAM paper.
 		 if (x==100 && y==100) printf("\nd=%f, layer=%i, cdata[cpt]=%f, E_a=%f, min_val=%f, min_layer=%i   ",d, layer, cdata[cpt], E_a, min_val, min_layer  );
@@ -584,7 +589,7 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 }
 	 a = min_layer;
 	 apt[pt] = a;
-	 /*
+	 *//*
 	 // Eq 18 from DTAM paper, subsample refinement. Consider gradient & curvature wrt adjacent depth levels.
 	 // (Otherwise use minimum of parabola through adjacent depth samples of the cost volume.)
 

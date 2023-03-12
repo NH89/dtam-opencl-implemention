@@ -17,6 +17,24 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 
+// indices for float params passed to __const params_buf
+#define PIXELS			0  // Can these be #included from a common header for both host and device code?
+#define ROWS			1
+#define COLS			2
+#define LAYERS			3
+#define MAX_INV_DEPTH	4
+#define MIN_INV_DEPTH	5
+#define INV_DEPTH_STEP	6
+#define ALPHA_G		7
+#define BETA_G			8	///  __kernel void CacheG4
+#define EPSILON 		9	///  __kernel void UpdateQD		// epsilon = 0.1
+#define SIGMA_Q 		10									// sigma_q = 0.0559017
+#define SIGMA_D 		11
+#define THETA			12
+#define LAMBDA			13	///   __kernel void UpdateA2
+#define SCALE_EAUX		14
+
+
 using namespace std;
 class RunCL
 {
@@ -41,7 +59,7 @@ public:
 	
 
 
-
+	float params[16] = {0};
 	int width, height, costVolLayers;
 	int count=0, keyFrameCount=0, costVolCount=0, QDcount=0, Acount=0;
 

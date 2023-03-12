@@ -251,14 +251,15 @@ CostVol::CostVol(
 	depthStep    = (near - far) / (layers - 1);
 
 
-	float params[16] = {0};
-	params[PIXELS] 			= rows*cols;
-	params[ROWS] 			= rows;
-	params[COLS] 			= cols;
-	params[LAYERS] 			= layers;
-	params[MAX_INV_DEPTH] 	= near;
-	params[MIN_INV_DEPTH] 	= far;
-	params[INV_DEPTH_STEP] 	= (params[MAX_INV_DEPTH] - params[MIN_INV_DEPTH])/(params[LAYERS] -1);
+	//float params[16] = {0};
+	cvrc.params[PIXELS] 			= rows*cols;
+	cvrc.params[ROWS] 			= rows;
+	cvrc.params[COLS] 			= cols;
+	cvrc.params[LAYERS] 			= layers;
+	cvrc.params[MAX_INV_DEPTH] 	= near;
+	cvrc.params[MIN_INV_DEPTH] 	= far;
+	cvrc.params[INV_DEPTH_STEP] 	= (cvrc.params[MAX_INV_DEPTH] - cvrc.params[MIN_INV_DEPTH])/(cvrc.params[LAYERS] -1);
+
 
 	cameraMatrix = _cameraMatrix.clone();
 
@@ -287,7 +288,7 @@ CostVol::CostVol(
 	cvrc.height = rows;
 
 	cout << "CostVol_chk 2\n" <<flush;
-	cvrc.allocatemem( (float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data, params);
+	cvrc.allocatemem( (float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data, cvrc.params);
 
 	cout << "CostVol_chk 3\n" << flush;
 	image.copyTo(baseImage);
@@ -327,6 +328,17 @@ CostVol::CostVol(
 	alloced = 0;
 	cachedG = 0;
 	dInited = 0;
+
+	// lambda, theta, sigma_d, sigma_q set by CostVol::computeSigmas(..) in CostVol.h, called in CostVol::updateQD() below.
+	computeSigmas(epsilon, theta);
+	cvrc.params[ALPHA_G]			=  0.015;		///  __kernel void CacheG4
+	cvrc.params[BETA_G]			=  1.5;
+	cvrc.params[EPSILON]			=  0.1;			///  __kernel void UpdateQD		// epsilon = 0.1
+	cvrc.params[SIGMA_Q]			=  0.0559017;									// sigma_q = 0.0559017
+	cvrc.params[SIGMA_D]			=  sigma_d;
+	cvrc.params[THETA]			=  theta;
+	cvrc.params[LAMBDA]			=  lambda;		///   __kernel void UpdateA2
+	cvrc.params[SCALE_EAUX]		=  10000;// from DTAM_Mapping input/json/icl_numin.json    //1.0;
 	cout << "CostVol_chk 6\n" << flush;
 }
 
