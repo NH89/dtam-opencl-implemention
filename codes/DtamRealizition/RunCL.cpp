@@ -214,8 +214,10 @@ void RunCL::DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem:
 			return;
 		}
 
-		// Squash/stretch & shift to 0.0-1.0 rane
-		if (minVal <0.0){
+		// Squash/stretch & shift to 0.0-1.0 range
+		if (max_range == 0){
+			temp_mat /= maxVal;
+		}else if (minVal <0.0){
 			temp_mat /=(2*max_range);
 			temp_mat +=0.5;
 		}else{
@@ -932,8 +934,8 @@ void RunCL::updateA(int layers, float lambda,float theta)
 		0,
 		NULL,
 		&writeEvt);
-	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; cout << "Error: allocatemem_chk1.4\n" << endl; exit_(status);}
-	else{cout << "allocatemem_chk1.4\n" << flush;}
+	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; cout << "Error: \nRunCL::updateA_chk0\n" << endl; exit_(status);}
+	else{cout << "\nRunCL::updateA_chk0\t\tlayers="<< params[LAYERS] <<" \n" << flush;}
 
 	status = clFlush(m_queue); 						if (status != CL_SUCCESS)	{ cout << "\nclFlush status = " << status << checkerror(status) <<"\n"<<flush; exit_(status);}
 	status = waitForEventAndRelease(&writeEvt); 	if (status != CL_SUCCESS)	{ cout << "\nwaitForEventAndRelease status = " << status << checkerror(status) <<"\n"<<flush; exit_(status);}
@@ -978,8 +980,8 @@ void RunCL::updateA(int layers, float lambda,float theta)
 		ss << count << "_theta"<<theta<<"_";;
 		cv::Size q_size( baseImage_size.width, 2* baseImage_size.height ); // double sized for qx and qy.
 		//DownloadAndSaveVolume(cdatabuf, ss.str(), paths.at("cdatabuf"), width * height * sizeof(float), baseImage_size, CV_32FC1,  false );
-		DownloadAndSave(amem,   ss.str(), paths.at("amem"),    width * height * sizeof(float), baseImage_size, CV_32FC1,  false , 0.000512 ); //64
-		DownloadAndSave(dmem,   ss.str(), paths.at("dmem"),    width * height * sizeof(float), baseImage_size, CV_32FC1,  false , 0.000512 ); //64
+		DownloadAndSave(amem,   ss.str(), paths.at("amem"),    width * height * sizeof(float), baseImage_size, CV_32FC1,  false , 0.0 ); //64 // 0.000512 // 0.002
+		DownloadAndSave(dmem,   ss.str(), paths.at("dmem"),    width * height * sizeof(float), baseImage_size, CV_32FC1,  false , 0.0 ); //64 // 0.000512 // 0.002
 		DownloadAndSave(qmem,   ss.str(), paths.at("qmem"),  2*width * height * sizeof(float), q_size        , CV_32FC1,  false , 0.1 ); //0.000008 //1); inv_d_step
 		clFlush(m_queue);
 		clFinish(m_queue);

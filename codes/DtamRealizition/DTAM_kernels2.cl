@@ -456,17 +456,19 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 if (x==100 && y==100) printf("\ndpt[pt]=%f, d=%f, sigma_d=%f, g1=%f, div_q=%f, a=%f, theta=%f, sigma_d=%f, theta=%f : qx=%f, qy=%f, maxq=%f, dd_x=%f, dd_y=%f ", dpt[pt], d, sigma_d, g1, div_q , a, theta, sigma_d, theta, qx, qy, maxq, dd_x, dd_y );
  }
 
-
-int set_start_layer(float di, float r, float far, float depthStep, int layers){
+// 					( inverse_depth, r , min_inv_depth, inv_depth_step, num_layers )
+int set_start_layer(float di, float r, float far, float depthStep, int layers, int x, int y){
     const float d_start = di - r;
-    const int start_layer = floor((d_start - far)/depthStep) - 1;
-    return (start_layer<0)? 0 : start_layer;// start_layer >= 0
+    const int start_layer =  floor( (d_start - far)/depthStep )    ;  //floor((d_start - far)/depthStep) - 1;
+	if (x==200 && y==200) printf("\n# start_layer=%i, d_start=%f, di=%f, r=%f, far=%f, depthStep=%f", start_layer, d_start, di, r, far, depthStep );
+    return (start_layer<0)? 0 : start_layer;   // start_layer >= 0
 }
 
-int set_end_layer(float di, float r, float far, float depthStep, int layers){
+int set_end_layer(float di, float r, float far, float depthStep, int layers, int x, int y){
     const float d_end = di + r;
     const int end_layer = ceil((d_end - far)/depthStep) + 1;          // lrintf = Round input to nearest integer value
     // int end_layer = 255;// int layer = int((d_end - far)/depthStep) + 1;
+    if (x==200 && y==200) printf("\n# end_layer=%i", end_layer );
     return  (end_layer>(layers-1))? (layers-1) : end_layer;// end_layer <= layers-1
 }
 
@@ -487,8 +489,8 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	__global float* cdata,                         //           cost volume
 	__global float* apt,                           // dmem,     depth D
 	__global float* dpt,                           // amem,     auxilliary A
-	__global float* hi,
 	__global float* lo,
+	__global float* hi,
 	__constant float* params
 	/*
 	int layers,
@@ -546,9 +548,9 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 const int   layerStep = rows*cols;
 	 //const float         d = dpt[pt];
 
-	 const float r = 2*theta*lambda*(hi[pt] - lo[pt]);
-	 const int start_layer = set_start_layer(d, r, max_d, depthStep, layers);
-	 const int end_layer   = set_end_layer(d, r, max_d, depthStep, layers);
+	 const float r = sqrt( 2*theta*lambda*(hi[pt] - lo[pt]) );
+	 const int start_layer = set_start_layer(d, r, min_d, depthStep, layers, x, y);  // 0;//
+	 const int end_layer   = set_end_layer(d, r, min_d, depthStep, layers, x, y);  // layers-1; //
 	 int minl = 0;
 	 float Eaux_min = 1e+30; // set high initial value
 
@@ -607,6 +609,10 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 		apt[pt] = a;
 	 }
 	*/
+
+	//if (x==200 && y==200) printf("\n\nUpdateA: theta=%f, lambda=%f, hi=%f, lo=%f, r=%f, d=%f, min_d=%f, depthStep=%f, layers=%i, start_layer=%i, end_layer=%i", \
+	//	theta, lambda, hi[pt], lo[pt], r, d, min_d, depthStep, layers, start_layer, end_layer );
+
  }
 
 /*

@@ -61,9 +61,9 @@ int main()
 					//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
 			65535,
 			i + offset,
-			image,																	// NB .png image is converted CV_8UC3 -> CV_32FC3, and given GaussianBlurr (3,3).
+			image,															// NB .png image is converted CV_8UC3 -> CV_32FC3, and given GaussianBlurr (3,3).
 			d,
-			cameraMatrix,															// NB recomputes cameraMatrix for each image, but hard codes 640x480.
+			cameraMatrix,													// NB recomputes cameraMatrix for each image, but hard codes 640x480.
 			R,
 			T);
 		cout << ", image.size="<<image.size;
