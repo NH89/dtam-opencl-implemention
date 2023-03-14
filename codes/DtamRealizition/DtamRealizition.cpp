@@ -1,9 +1,5 @@
-// DtamRealizition.cpp : 定义控制台应用程序的入口点。
-//
-//#include "stdafx.h"   // windows precompiled header file
-//#include <boost/filesystem.hpp> // included from RunCl.h, via CostVol.h
-#include "CostVol.h"
 
+#include "CostVol.h"
 #include "fileLoader.hpp"
 #include <iostream>		// /usr/include/c++/11/iostream
 #include <iomanip>		// /usr/include/c++/11/iomanip
@@ -12,50 +8,49 @@
 #include <fstream>		// /usr/include/c++/11/fstream
 #include <string>		// /usr/include/c++/11/string
 #include <sstream>		// /usr/include/c++/11/sstream
-//#include <filesystem>
 
 using namespace cv;
 using namespace std;
 int main()
 {
 	cout << "\n main_chk 0\n" << flush;
-	int numImg = 50;
-	int imagesPerCV 			= 30;
+	int numImg 			= 50;
+	int imagesPerCV 	= 30;
 	char filename[500];
-	Mat image, R, T;						// TODO where do these values come from ? See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
-	Mat cameraMatrix = (Mat_<float>(3, 3) << 481.20,   0.0,  319.5,
+	Mat image, R, T;														// See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
+	Mat cameraMatrix = (Mat_<float>(3, 3) <<  481.20,   0.0,  319.5,
 												0.0,  480.0,  239.5,
 												0.0,    0.0,    1.0);
 
-	cout << "\n main_chk 1\n" << flush;  	// make output folders ////////////////////////////////////////////////////////////
+	cout << "\n main_chk 1\n" << flush;  									// make output folders //
 	std::time_t   result  = std::time(nullptr);
 	std::string   out_dir = std::asctime(std::localtime(&result));
-	out_dir.pop_back(); 															// req to remove new_line from end of string.
+	out_dir.pop_back(); 													// req to remove new_line from end of string.
 	boost::filesystem::path out_path(boost::filesystem::current_path());
-	out_path = out_path.parent_path();												// move "out_path" up two levels in the directory tree.
+	out_path = out_path.parent_path();										// move "out_path" up two levels in the directory tree.
 	out_path = out_path.parent_path();
-	out_path += "/output/";// + out_dir;
+	out_path += "/output/";
 
 	if(boost::filesystem::create_directory(out_path)) { std::cerr<< "Directory Created: "<<out_path<<std::endl;
 	}else{ std::cerr<< "Directory previously created: "<<out_path<<std::endl;
 	}
 	out_path +=  out_dir;
 	cout <<"Creating output directories: "<< out_path <<std::endl;
-	boost::filesystem::create_directory(out_path);//, ec);
+	boost::filesystem::create_directory(out_path);
 	out_path += "/";
 
-	cout << "\n main_chk 1.2\n" << flush; ////////////////////////////////////////////////////////////////////////////////
+	cout << "\n main_chk 1.2\n" << flush;
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;
 	float reconstructionScale = 1;
 	int inc = 1;
 
 	cout << "\n main_chk 2\n" << flush;
-	for (int i =0; i < imagesPerCV; i += inc) {												// Load images & data from file into c++ vectors
+	for (int i =0; i < imagesPerCV; i += inc) {								// Load images & data from file into c++ vectors
 		Mat tmp, d, image;
-		int offset = 10;//46;//462;//380;//0;// better location in this dataset for translation for paralax flow.
-																					// TODO use a control file specifying where to sample the video.
+		int offset = 10;							//46;//462;//380;//0;	// better location in this dataset for translation for paralax flow.
+																			// TODO use a control file specifying where to sample the video.
 		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
-				   //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
+				    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
 					//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
@@ -89,73 +84,37 @@ int main()
 		}std::cout<<"\n"<< std::flush;
 	}std::cout<<"\n"<< std::flush;
 
-//	return 0; //#################### early halt #################################
-
-	cout << "\n main_chk 3\n" << flush;
-	//Setup camera matrix
+	cout << "\n main_chk 3\n" << flush; 									//Setup camera matrix
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
-	int layers 					= 64;//32;//
-	float min_inv_depth = 1.0/4500.0;//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
-	float max_inv_depth = 1.0/1400.0;
-	/*
-	 * depth_min":1.0,
-		"depth_max":6.0,
-		"layers_" : 256,
-		"frames_per_reference_image" :20,
-		"similarity": "per_pixel",
-	 *//*
-	// Inverse depth step
-	float min_d = params[min_depth];// 1400.0;  // Minimum distance in units of pose transform. For ICL dataset this appears to be in mm.
-	float max_d = params[max_depth];// 4500.0;
-	float max_inv_d = 1/min_d;
-	float min_inv_d = 1/max_d;
-	float inv_d_step = params[inv_d_step];// (max_inv_d - min_inv_d)/(params[layers] -1);
-	*/
-
+	int layers 					= 64;										//32;//
+	float min_inv_depth 		= 1.0/4500.0;								//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
+	float max_inv_depth 		= 1.0/1400.0;
 	float occlusionThreshold 	= .05;
 	int startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
-
-	/*
-	Mat temp;
-    images[startAt].convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
-	cv::imshow("Initial image main loop", temp );
-	*/
-
-                                                                                   // Instantiate CostVol ///////////
+																			// Instantiate CostVol ///////////
 	CostVol cv(images[startAt], (FrameID)startAt, layers, max_inv_depth, min_inv_depth, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path);
 
-
-//	return 0; //#################### early halt #################################
-
-	cout << "\n main_chk 4\n" << flush;
-	cout << "calculate cost volume: ================================================" << endl << flush;
-	for (int imageNum = 0; imageNum < imagesPerCV; imageNum+=1){                              // Update CostVol ////////////////
+	cout << "\n main_chk 4\tcalculate cost volume: ================================================" << endl << flush;
+	for (int imageNum = 0; imageNum < imagesPerCV; imageNum+=1){			// Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
 	}
 	cv.cvrc.saveCostVols();
 
-	cout << "\n main_chk 5\n" << flush;
-	cout << "cacheGValues: =========================================================" << endl;
-	cv.cacheGValues();                                                             // cacheGValues()  elementwise weighting on keframe image gradient
+	cout << "\n main_chk 5\tcacheGValues: =========================================================" << endl<<flush;
+	cv.cacheGValues();														// cacheGValues()  elementwise weighting on keframe image gradient
 
-//	int res = 0;
-//	cv.cvrc.exit_(res); // ############## early halt ##############
-//	cv.initializeAD();
-
-	cout << "\n main_chk 6\n" << flush;
-	cout << "optimizing: ===========================================================" << endl;
+	cout << "\n main_chk 6\toptimizing: ===========================================================" << endl<<flush;
 	bool doneOptimizing;
 	int opt_count = 0;
 	do {
 		for (int i = 0; i < 10; i++)
-			cv.updateQD();                                                         // Optimize Q, D   (primal-dual)
-		doneOptimizing = cv.updateA();                                             // Optimize A      (pointwise exhaustive search)
-		//doneOptimizing = true; // debug single loop TODO remove this line.
+			cv.updateQD();													// Optimize Q, D   (primal-dual)
+		doneOptimizing = cv.updateA();										// Optimize A      (pointwise exhaustive search)
 		opt_count ++;
-	} while (!doneOptimizing && (opt_count<4));  //  );//
+	} while (!doneOptimizing && (opt_count<60));
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;
@@ -163,7 +122,7 @@ int main()
 	cv::Mat depthImg;
 
 	cout << "\n main_chk 8\n" << flush;
-	cv.GetResult();                                                                // GetResult /////////////////////
+	cv.GetResult();															// GetResult /////////////////////
     depthMap = cv._a;
 
 	double minVal=1, maxVal=1;
@@ -177,7 +136,5 @@ int main()
 	cv::waitKey(-1);
 
 	cout << "\n main_chk 9 : finished\n" << flush;
-	//return 0;
 	exit(0);
 }
-

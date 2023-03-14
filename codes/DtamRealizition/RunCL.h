@@ -61,7 +61,7 @@ public:
 
 	float params[16] = {0};
 	int width, height, costVolLayers;
-	int count=0, keyFrameCount=0, costVolCount=0, QDcount=0, Acount=0;
+	int count=0, keyFrameCount=0, costVolCount=0, QDcount=0, A_count=0;
 
 	size_t image_size_bytes;
 	cv::Size baseImage_size;

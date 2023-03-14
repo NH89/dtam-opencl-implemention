@@ -84,7 +84,6 @@ void CostVol::checkInputs(
 }
 
 
-
 CostVol::CostVol(
 	Mat image,
 	FrameID 	_fid,
@@ -98,7 +97,7 @@ CostVol::CostVol(
 	boost::filesystem::path 	out_path,
 	float 		initialCost,
 	float 		initialWeight
-) // NB defaults: float initialCost = 3.0, float initialWeight = .001
+) 															// NB defaults: float initialCost = 3.0, float initialWeight = .001
 	:
 	R(R), T(T), occlusionThreshold(occlusionThreshold), initialWeight(initialWeight), cvrc(out_path) // constructors for member classes //
 {
@@ -121,7 +120,7 @@ CostVol::CostVol(
 	for (int i=0; i<3; i++) pose.operator()(i,3)     = T.at<float>(i);
 	pose.operator()(3,3) = 1;
 	cout << "CostVol_chk 2\n" << flush;
-	//inv_pose = pose.inv();                // opencv mtx::inv() may not be efficient or reliable, depends on choice of decomposition method.
+
 	for (int i=0; i<3; i++){
 		for (int j=0; j<3; j++){
 			inv_pose.operator()(i,j) = pose.operator()(j,i);
@@ -133,8 +132,7 @@ CostVol::CostVol(
 	}
 	for (int i=0; i<4; i++) inv_pose.operator()(3,i) = pose.operator()(3,i);
 
-	// Verify inv_pose:////////////////////////////////////////////////////
-	cout<<"\n\ninv_pose\n";
+	cout<<"\n\ninv_pose\n";									// Verify inv_pose:////////////////////////////////////////////////////
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
 			cout<<"\t"<< std::setw(5)<<inv_pose.operator()(i,j);
@@ -165,8 +163,7 @@ CostVol::CostVol(
 		cout<<"\tK.operator()(i/3,i%3)="<<K.operator()(i/3,i%3)<<","<<flush;
 		cout<<"\tcameraMatrix.at<float>(i/3,i%3)="<<_cameraMatrix.at<float>(i/3,i%3)<<","<<flush;
 		K.operator()(i/3,i%3) = _cameraMatrix.at<float>(i/3,i%3);
-
-	} // TODO later, restructure mainloop to build costvol continuously...
+	}														 // TODO later, restructure mainloop to build costvol continuously...
 	K.operator()(3,3)  = 1;
 
 	cout << "\n\nCostVol_chk 4\n" << flush;
@@ -190,9 +187,7 @@ CostVol::CostVol(
 	inv_K.operator()(0,2)  = (cy*skew - cx*fy)/(fx*fy);
 	inv_K.operator()(1,2)  = -cy/fy;
 
-
-	// Verify inv_K:
-	cout<<"\n\ntest_camera_intrinsic_matrix inversion\n";
+	cout<<"\n\ntest_camera_intrinsic_matrix inversion\n";	// Verify inv_K:
 	cv::Matx44f test_K = inv_K * K;
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
@@ -201,8 +196,7 @@ CostVol::CostVol(
 	}cout<<"\n";
 	////////////////////////////////////////////////////////////////////////
 
-
-	std::cout << std::fixed << std::setprecision(-1);				//  Inspect values in matricies ///////
+	std::cout << std::fixed << std::setprecision(-1);		//  Inspect values in matricies ///////
 	cout<<"\n\npose\n";
 	for(int i=0; i<4; i++){
 		for(int j=0; j<4; j++){
@@ -231,13 +225,9 @@ CostVol::CostVol(
 		}cout<<"\n";
 	}cout<<"\n";
 
-
-	/////////////////////////////////////////////////////////////////////////////
-
 	std::cout << "\n\nCostVol_chk 0\n" << std::flush;
-	//For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
+															//For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
 	CV_Assert(image.rows % 32 == 0 && image.cols % 32 == 0 && image.cols >= 64);
-	//     CV_Assert(_layers>=8);
 
 	cout << "CostVol_chk 1\n" << flush;
 	checkInputs(R, T, _cameraMatrix);
@@ -250,9 +240,7 @@ CostVol::CostVol(
     cout << "CostVol_chk 1.1\n" << flush;
 	depthStep    = (near - far) / (layers - 1);
 
-
-	//float params[16] = {0};
-	cvrc.params[PIXELS] 			= rows*cols;
+	cvrc.params[PIXELS] 		= rows*cols;
 	cvrc.params[ROWS] 			= rows;
 	cvrc.params[COLS] 			= cols;
 	cvrc.params[LAYERS] 		= layers;
@@ -260,18 +248,14 @@ CostVol::CostVol(
 	cvrc.params[MIN_INV_DEPTH] 	= far;
 	cvrc.params[INV_DEPTH_STEP] 	= (cvrc.params[MAX_INV_DEPTH] - cvrc.params[MIN_INV_DEPTH])/(cvrc.params[LAYERS] -1);
 
-
 	cameraMatrix = _cameraMatrix.clone();
-
-	// solve projection with
-	solveProjection(R, T);
+	solveProjection(R, T);									// solve projection
     cout << "CostVol_chk 1.2 \n";
 	cout<< "layers="<<cvrc.params[LAYERS]<<",\tcvrc.params[INV_DEPTH_STEP]="<< cvrc.params[INV_DEPTH_STEP];
 	cout<<"=("<<cvrc.params[MAX_INV_DEPTH]<<" - "<< cvrc.params[MIN_INV_DEPTH] <<") / ("<< cvrc.params[LAYERS] <<" -1 )\n" << flush;
 
 	costdata = Mat::ones(layers, rows * cols, CV_32FC1);//zeros
 	costdata = initialCost;
-    
 	hit      = Mat::zeros(layers, rows * cols, CV_32FC1);
 	hit      = initialWeight;
 	
@@ -289,39 +273,23 @@ CostVol::CostVol(
 	_gx = _gy   = 1;
 	cvrc.width  = cols;
 	cvrc.height = rows;
-
-	cout << "CostVol_chk 2\n" <<flush;
 	cvrc.allocatemem( (float*)_qx.data, (float*)_qy.data, (float*)_gx.data, (float*)_gy.data, cvrc.params);
 
-	cout << "CostVol_chk 3\n" << flush;
 	image.copyTo(baseImage);
-	/*
-	Mat temp;
-    image.convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
-	cv::imshow("base image CostVol constructor", temp);
-	*/
-	baseImage = baseImage.reshape(0, rows); 				// redundant, given that rows = baseImage.rows
-    
-	cout << "CostVol_chk 4\n" << flush;
+	baseImage 		= baseImage.reshape(0, rows); 			// redundant, given that rows = baseImage.rows
 	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
-	/*
-	cv::Mat temp;
-	baseImageGray.convertTo(temp, CV_8U);                             // NB need CV_U8 for imshow(..)
-	//cv::imshow("bgray", temp);
-	imshow("costVol baseImageGray CV_8U", temp );
-	*/
-	baseImageGray = baseImageGray.reshape(0, rows);			// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
+	baseImageGray 	= baseImageGray.reshape(0, rows);		// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
 
-
-	
-	cout << "CostVol_chk 5\n" << flush;
     count      = 0;
-	float off  = layers / 32;
-	thetaStart = 0.2;		//200.0*off;					// Why ? DTAM_Mapping has Theta_start = 0.2
-	thetaMin   = 1.0e-4;	//1.0*off;
-	thetaStep  = .97;
+	//float off  = layers / 32;
+
+
+
+	thetaStart = 0.1;//0.2;		//200.0*off;					// DTAM paper & DTAM_Mapping has Theta_start = 0.2
+	//thetaMin   = 9.9e-8;	//1.0e-4;	//1.0*off;			// DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
+	thetaStep  = 0.87;      //0.97;
 	epsilon    = 1.0e-4;	//.1*off;
-	lambda     = 1.0;		//.001 / off;
+	lambda     = 1.0;		//.001 / off;					// DTAM paper: lambda = 1 for 1st key frame, and 1/(1+0.5*min_depth) thereafter
 	theta      = thetaStart;
 	old_theta  = theta;
 
@@ -334,17 +302,16 @@ CostVol::CostVol(
 
 	// lambda, theta, sigma_d, sigma_q set by CostVol::computeSigmas(..) in CostVol.h, called in CostVol::updateQD() below.
 	computeSigmas(epsilon, theta);
-	cvrc.params[ALPHA_G]		=  0.015;		///  __kernel void CacheG4
-	cvrc.params[BETA_G]			=  1.5;
+	cvrc.params[BETA_G]			=  1.5;											// DTAM paper : beta=0.001 while theta>0.001, else beta=0.0001
+	cvrc.params[ALPHA_G]		=  0.015 * pow(256,cvrc.params[BETA_G]);		///  __kernel void CacheG4, with correction for CV_8UC3 -> CV_32FC3
 	cvrc.params[EPSILON]		=  0.1;			///  __kernel void UpdateQD		// epsilon = 0.1
 	cvrc.params[SIGMA_Q]		=  0.0559017;									// sigma_q = 0.0559017
 	cvrc.params[SIGMA_D]		=  sigma_d;
 	cvrc.params[THETA]			=  theta;
 	cvrc.params[LAMBDA]			=  lambda;		///   __kernel void UpdateA2
-	cvrc.params[SCALE_EAUX]		=  10000;// from DTAM_Mapping input/json/icl_numin.json    //1.0;
+	cvrc.params[SCALE_EAUX]		=  10000;		// from DTAM_Mapping input/json/icl_numin.json    //1.0;
 	cout << "CostVol_chk 6\n" << flush;
 }
-
 
 void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T) 
 {
@@ -463,7 +430,6 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 	cout << "\nupdateCost chk7_finished\n" << flush;
 }
 
-
 void CostVol::cacheGValues()
 {
 	cout<<"\nCostVol::cacheGValues()"<<flush;
@@ -472,14 +438,6 @@ void CostVol::cacheGValues()
 
 	cvrc.cacheGValue2(baseImageGray, theta);
 }
-
-/*
-void CostVol::initializeAD()
-{
-	cout<<"\nCostVol::initializeAD()"<<flush;
-	cvrc.initializeAD();
-}
-*/
 
 void CostVol::updateQD()
 {
@@ -492,13 +450,15 @@ void CostVol::updateQD()
 	cout<<"\nupdateQD_chk3, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
 }
 
-
 bool CostVol::updateA()
 {
-	if (theta < 0.001 && old_theta > 0.001){cacheGValues(); old_theta=theta;}
+	if (theta < 0.001 && old_theta > 0.001){
+		cacheGValues();
+		old_theta=theta;
+	}
 
 	cout<<"\nCostVol::updateA_chk0, "<<flush;
-	bool doneOptimizing = theta <= thetaMin;
+	// bool doneOptimizing = (theta <= thetaMin);
 
 	cout<<"\nCostVol::updateA_chk1, "<<flush;
 	cvrc.updateA(layers,lambda,theta);
@@ -506,9 +466,8 @@ bool CostVol::updateA()
 	cout<<"\nCostVol::updateA_chk2, "<<flush;
 	theta *= thetaStep;
 
-	return doneOptimizing;
+	//return doneOptimizing;
 }
-
 
 void CostVol::GetResult()
 {
@@ -525,4 +484,3 @@ void CostVol::GetResult()
 
 	cout<<"\nCostVol::GetResult_chk2_finished"<<flush;
 }
-

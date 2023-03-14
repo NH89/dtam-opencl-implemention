@@ -39,7 +39,15 @@ void loadAhanda(const char * rootpath,
     /*
     cv::imshow("loadAhanda png", image);
     */
-    image.convertTo(image, CV_32F);                            // convert 8-bit uchar -> 32-bit float
+    if (image.type() == CV_32FC3) {}
+    else if(image.type() == CV_8UC3){
+      image.convertTo(image, CV_32F);                            // convert 8-bit uchar -> 32-bit float
+      image /= 256;
+    }else{
+      std::cout << "\n\nFileloader.cpp, loadAhanda(..) :  unhandled image type "<< image.type() <<"\n"<<std::flush;
+      exit(0);
+    }
+
     /*
     Mat temp;
     image.convertTo(temp, CV_8U);                              // NB need CV_U8 for imshow(..)
