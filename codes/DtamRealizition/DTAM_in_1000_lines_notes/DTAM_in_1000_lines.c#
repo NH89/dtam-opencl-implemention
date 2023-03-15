@@ -1,0 +1,842 @@
+
+
+
+
+
+
+
+
+############  /// Step 1. Establishing Ground-Truth
+
+RenderTexture inverseDepthGT = createRT(width, height, RenderTextureFormat.ARGBFloat);
+camera.targetTexture = inverseDepthGT;
+camera.RenderWithShader(Shader.Find("Custom/InverseDepth"), string.Empty);
+camera.targetTexture = null;
+
+##########
+
+Shader "Custom/InverseDepth"Shader "Custom/InverseDepth"{
+	Properties {
+		_MainTex ("Texture", 2D) = "white" {}
+		} SubShader {
+			Tags {
+				"RenderType"="Opaque"
+			}
+			LOD 100
+			Pass {
+				CGPROGRAM #pragma vertex vert #pragma fragment frag #include "UnityCG.cginc"
+				struct appdata {
+					float4 vertex : POSITION;
+ 					float2 uv : TEXCOORD0;
+ 				};
+
+				struct v2f {
+					float4 hCoord : TEXCOORD0;
+ 					float4 vertex : SV_POSITION;
+ 				};
+
+				v2f vert (appdata v) {
+					v2f o;
+ 					o.vertex = UnityObjectToClipPos(v.vertex);
+ 					o.hCoord = o.vertex;
+ 					return o;
+ 				}
+ 				fixed4 frag (v2f i) : SV_Target {
+					return abs(1.0/i.hCoord.w);
+ 				}
+ 				ENDCG
+ 			}
+ 		}
+ 	}
+
+
+
+
+
+############ /// The Cost Volume  ////////////////////////////////////////
+
+public class SampleFrame
+{
+	public RenderTexture Image;
+	public Matrix4x4 Intrinsics;
+	public Matrix4x4 CameraToWorld;
+}
+
+public class Keyframe
+{
+public RenderTexture Image;
+public RenderTexture DepthImage;
+public RenderTexture CostVolume;
+
+public Matrix4x4 Intrinsics;
+public Matrix4x4 CameraToWorld;
+public int depth;
+public float invDepthMax;
+public float invDepthMin;
+
+RenderTexture createRT(int width, int height, RenderTextureFormat format)
+{
+	RenderTexture rt = new RenderTexture(width, height, 0, format, RenderTextureReadWrite.Linear);
+	rt.enableRandomWrite = true;
+	rt.filterMode = FilterMode.Point;
+	rt.Create();
+	return rt;
+}
+
+public void Initialize(SampleFrame frame, int numDepthValues,
+ComputeShader initCostShader)
+{
+	int width = frame.Image.width;
+int height = frame.Image.height;
+this.Intrinsics = frame.Intrinsics;
+this.CameraToWorld = frame.CameraToWorld;
+this.depth = numDepthValues;
+this.Image = frame.Image;
+this.DepthImage = createRT(width, height, RenderTextureFormat.ARGBFloat);
+float maxDepthInMeters = 3;
+float minDepthInMeters = 0.5f;
+this.invDepthMax = Mathf.Max(1.0f / maxDepthInMeters, 1.0f / minDepthInMeters);
+this.invDepthMin = Mathf.Min(1.0f / maxDepthInMeters, 1.0f / minDepthInMeters);
+
+int numElems = (width * height * depth);
+int ideal2DPixels = Mathf.CeilToInt(Mathf.Sqrt((float)numElems));
+int texWidth = ideal2DPixels;
+int texHeight = ideal2DPixels;
+
+this.CostVolume = createRT(texWidth, texHeight, RenderTextureFormat.ARGBFloat);
+resetCostVolume(initCostShader);
+}
+
+void resetCostVolume(ComputeShader cs)
+{
+int kernel = cs.FindKernel("CSMain");
+uint threadX, threadY, threadZ;
+cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+cs.SetTexture(kernel, "Result", CostVolume);
+cs.Dispatch(kernel, Mathf.CeilToInt((float)CostVolume.width / (float)threadX), Mathf.CeilToInt((float)CostVolume.height / (float)threadY), (int)threadZ);
+}
+
+
+
+
+#############
+
+// Each #kernel tells which function to compile; you can have many kernels// Each #kernel tells which function to compile; you can have many kernels#pragma kernel CSMain
+// Create a RenderTexture with enableRandomWrite flag and set it// with cs.SetTextureRWTexture2D<float4> Result;
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+	Result[id.xy] = 0;}
+
+
+
+
+#############
+
+public class Debug3DMapper : MonoBehaviour {
+
+public Keyframe keyframe;
+public AnimationClip clip;
+public int width = 320;
+public int height = 240;
+public int depth = 512;
+public ComputeShader initCostShader;
+public ComputeShader updateCostShader;
+
+RenderTexture createRT(int width, int height, RenderTextureFormat format)
+{
+RenderTexture rt = new RenderTexture(width, height, 24, format, RenderTextureReadWrite.Linear);
+rt.enableRandomWrite = true;
+rt.filterMode = FilterMode.Point;
+rt.Create();
+return rt;
+}
+
+Matrix4x4 toNDC(Matrix4x4 src, int width, int height, float znear, float zfar)
+{
+Matrix4x4 dst = Matrix4x4.zero;
+dst.m00 = 2.0f * src.m00 / width;
+dst.m02 = -(src.m02 / width) + 0.5f;
+dst.m11 = 2.0f * src.m11 / height;
+dst.m12 = -(src.m12 / height) + 0.5f;
+dst.m22 = -(znear + zfar) / (zfar - znear);
+dst.m23 = -2.0f * znear * zfar / (zfar - znear);
+dst.m32 = -1.0f;
+return dst;
+}
+
+void performSimulation()
+
+{
+
+Camera camera = this.GetComponent<Camera>();
+float length = clip.length;
+float fps = 5.0f;
+float sampleTimeOffset = 1.0f / fps;
+clip.SampleAnimation(this.gameObject, 0);
+
+Matrix4x4 intrinsics = Matrix4x4.identity;
+intrinsics.m00 = (width * 0.5f) / Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+intrinsics.m02 = width * 0.5f;
+intrinsics.m11 = (height * 0.5f) / Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+intrinsics.m12 = height * 0.5f;
+
+Matrix4x4 ndcIntrinsics = toNDC(intrinsics, width, height, camera.nearClipPlane, camera.farClipPlane);
+camera.projectionMatrix = ndcIntrinsics;
+
+SampleFrame frame = new SampleFrame();
+frame.CameraToWorld = camera.transform.localToWorldMatrix;
+frame.Intrinsics = intrinsics;
+frame.Image = createRT(width, height, RenderTextureFormat.ARGBFloat);
+camera.targetTexture = frame.Image;
+camera.Render();
+keyframe = new Keyframe();
+keyframe.Initialize(frame, depth, initCostShader);
+for (float t = sampleTimeOffset; t < length; t += sampleTimeOffset)
+{
+clip.SampleAnimation(this.gameObject, t);
+SampleFrame newFrame = new SampleFrame();
+newFrame.CameraToWorld = camera.transform.localToWorldMatrix;
+newFrame.Intrinsics = intrinsics;
+newFrame.Image = createRT(width, height, RenderTextureFormat.ARGBFloat);
+camera.targetTexture = newFrame.Image;
+camera.Render();
+keyframe.UpdateCostVolume(newFrame, updateCostShader);
+}
+
+}
+
+}
+
+
+###################################   /// UpdateCostVolume(..)
+
+public void UpdateCostVolume(SampleFrame frame, ComputeShader updateCostShader)
+{
+updateCosts(frame, updateCostShader);
+}
+
+void updateCosts(SampleFrame frame, ComputeShader cs)
+{
+int kernel = cs.FindKernel("CSMain");
+uint threadX, threadY, threadZ;
+cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+cs.SetInt("_width", Image.width);
+cs.SetInt("_height", Image.height);
+cs.SetInt("_depth", depth);
+cs.SetInt("_texWidth", CostVolume.width);
+cs.SetInt("_texHeight", CostVolume.height);
+cs.SetFloat("_invDepthMax", invDepthMax);
+cs.SetFloat("_invDepthMin", invDepthMin);
+
+Matrix4x4 keyframeToSample = frame.CameraToWorld.inverse * CameraToWorld;
+Matrix4x4 invIntrinsics = Intrinsics.inverse;
+cs.SetVector("_intrinsics", new Vector4(Intrinsics.m00, Intrinsics.m11, Intrinsics.m02, Intrinsics.m12));
+cs.SetVector("_invIntrinsics", new Vector4(invIntrinsics.m00, invIntrinsics.m11, invIntrinsics.m02, invIntrinsics.m12));
+cs.SetVector("_keyframeToSampleR0", keyframeToSample.GetRow(0));
+cs.SetVector("_keyframeToSampleR1", keyframeToSample.GetRow(1));
+cs.SetVector("_keyframeToSampleR2", keyframeToSample.GetRow(2));
+cs.SetTexture(kernel, "KeyframeImg", Image);
+cs.SetTexture(kernel, "SampleImg", frame.Image);
+cs.SetTexture(kernel, "Result", CostVolume);
+cs.Dispatch(kernel, Mathf.CeilToInt((float)CostVolume.width / (float)threadX), Mathf.CeilToInt((float)CostVolume.height / (float)threadY), (int)threadZ);
+}
+
+
+
+###################
+
+#pragma kernel CSMain
+#pragma kernel CSMain
+
+RWTexture2D<float4> KeyframeImg;
+RWTexture2D<float4> SampleImg;
+RWTexture2D<float4> Result;
+
+uniform float _invDepthMax;
+uniform float _invDepthMin;
+uniform int _texWidth; 		//texture width of cost volume
+uniform int _texHeight; 	//texture height of cost volume
+uniform int _width; 		//width of image
+uniform int _height;		//height of image
+uniform int _depth;		//number of samples in inverse depth space
+
+uniform float4 _intrinsics;
+uniform float4 _invIntrinsics;
+uniform float4 _keyframeToSampleR0;
+uniform float4 _keyframeToSampleR1;
+uniform float4 _keyframeToSampleR2;
+
+float4 bilinearSample(float2 pt){
+	uint2 pt00 = uint2(floor(pt.x), floor(pt.y));
+ 	uint2 pt01 = uint2(floor(pt.x), ceil(pt.y));
+ 	uint2 pt10 = uint2(ceil(pt.x), floor(pt.y));
+ 	uint2 pt11 = uint2(ceil(pt.x), ceil(pt.y));
+ 	float wX = pt.x - (float)pt00.x;
+ 	float wY = pt.y - (float)pt00.y;
+
+	return lerp(lerp(SampleImg[pt00], SampleImg[pt10], wX), lerp(SampleImg[pt01], SampleImg[pt11], wX), wY);
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID){
+	uint texIdx 			= id.x + id.y * _texWidth;
+ 	uint3 cellIdx 			= uint3(texIdx % _width, (texIdx / _width) % _height, (texIdx / (_width * _height)));
+ 	float3 invRecip 		= 1.0 / float3(_width - 1, _height - 1, _depth - 1);
+ 	float3 cellIdxNormalized 	= float3(cellIdx)* invRecip;
+
+	if (texIdx > _width*_height*_depth) {
+		Result[id.xy] = 0;
+ 	} else
+ 	{
+ 		float3 pointInKeyframe 		= float3((float2)cellIdx.xy * _invIntrinsics.xy + _invIntrinsics.zw, 1);
+ 		pointInKeyframe 		/= lerp(_invDepthMax, _invDepthMin, cellIdxNormalized.z);
+		float4 pointInKeyframeH 	= float4(pointInKeyframe, 1.0);
+ 		float4 pointInSample 		= float4(\
+ 							dot(_keyframeToSampleR0, pointInKeyframeH), \
+ 							dot(_keyframeToSampleR1, pointInKeyframeH), \
+ 							dot(_keyframeToSampleR2, pointInKeyframeH), \
+ 							1.0);
+ 		float3 pointInSampleImage 	= float3(pointInSample.xy * _intrinsics.xy + pointInSample.z * _intrinsics.zw, pointInSample.z);
+ 		pointInSampleImage.xy 		/= pointInSampleImage.z;
+
+ 		if ((pointInSampleImage.x >= 0 && pointInSampleImage.x <= _width - 1 && pointInSampleImage.y >= 0 && pointInSampleImage.y <= _height - 1) && pointInSample.z > 0)
+ 		{
+ 			float3 samp = bilinearSample(pointInSampleImage).rgb;						//bilinear //
+ 			float3 samp = SampleImg[uint2(floor(pointInSampleImage.x), floor(pointInSampleImage.y))].rgb;	//nearest
+ 			float3 residual = KeyframeImg[cellIdx.xy].rgb - samp;
+ 			float oldR = Result[id.xy].x;
+ 			float oldN = Result[id.xy].y;
+ 			float newN = oldN + 1;
+ 			float4 residuals = 0;
+ 			residuals.r = oldR + (dot(abs(residual), 1) - oldR) / newN;
+ 			residuals.g = newN;
+ 			Result[id.xy] = residuals;
+ 		}
+ 	}
+}
+
+
+
+
+
+
+
+
+################
+
+/// Naive Depth Map Algorithm #########  /////////////////////////////////////////////////////////////////////////
+
+//Added as a public member
+
+public RenderTexture NaiveDepthImage;
+
+//Added to Initialize() function
+
+NaiveDepthImage = createRT(width, height, RenderTextureFormat.ARGBFloat);
+
+public void ComputeNaiveDepth(ComputeShader cs)
+{
+int kernel = cs.FindKernel("CSMain");
+uint threadX, threadY, threadZ;
+cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+cs.SetInt("_width", NaiveDepthImage.width);
+cs.SetInt("_height", NaiveDepthImage.height);
+cs.SetInt("_depth", depth);
+cs.SetInt("_texWidth", CostVolume.width);
+cs.SetInt("_texHeight", CostVolume.height);
+cs.SetFloat("_invDepthMax", invDepthMax);
+cs.SetFloat("_invDepthMin", invDepthMin);
+cs.SetTexture(kernel, "CostVolume", CostVolume);
+cs.SetTexture(kernel, "Result", NaiveDepthImage);
+cs.Dispatch(kernel, Mathf.CeilToInt((float)NaiveDepthImage.width / (float)threadX), Mathf.CeilToInt((float)NaiveDepthImage.height / (float)threadY), (int)threadZ);
+}
+
+
+#######
+
+#pragma kernel CSMain#pragma kernel CSMain
+RWTexture2D<float4> CostVolume;
+RWTexture2D<float4> Result;
+
+uniform float _invDepthMax;
+uniform float _invDepthMin;
+uniform int _texWidth;      //texture width of cost volume
+uniform int _texHeight;     //texture height of cost volume
+uniform int _width;         //width of image
+uniform int _height;        //height of image
+uniform int _depth;         //number of samples in inverse depth space
+
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+    uint stride = id.x + id.y * _width;
+    uint2 coord = uint2(stride % _texWidth, stride / _texWidth);
+    float bestVal = CostVolume[coord].r;
+    uint bestDepthIdx = 0;
+    for (uint depth_idx = 0; depth_idx < _depth; depth_idx++, stride += _width*_height) {
+        uint2 newCoord = uint2(stride % _texWidth, stride / _texWidth);
+        float4 val = CostVolume[newCoord];
+        if (val.r < bestVal) {
+            bestVal = val.r;
+            bestDepthIdx = depth_idx;
+        }
+    }
+    float bestInvDepth = lerp(_invDepthMax, _invDepthMin, (float)bestDepthIdx / (float)(_depth - 1));
+    Result[id.xy] = bestInvDepth;
+}
+
+
+
+
+
+########  ///   Optimizing the Depth Map ////////////////////////////////////////////////////
+
+public RenderTexture QImage;
+public RenderTexture DImage;
+public RenderTexture AImage;
+public RenderTexture Regularizer;
+
+//Add the following to the Initialize() function
+this.Regularizer = createRT(width, height, RenderTextureFormat.ARGBFloat);
+this.QImage = createRT(width, height, RenderTextureFormat.ARGBFloat);
+this.DImage = createRT(width, height, RenderTextureFormat.ARGBFloat);
+this.AImage = createRT(width, height, RenderTextureFormat.ARGBFloat);
+
+##########
+
+
+public void SolveDepthMap(ComputeShader initSolveShader, ComputeShader updateQShader,
+ComputeShader updateDShader, ComputeShader updateAShader, ComputeShader regularizerShader, ComputeShader projectQShader, DTAMSettings settings)
+{
+    initRegularizer(regularizerShader, settings.alpha, settings.beta);
+    initSolver(initSolveShader);
+
+    float theta_n = 0.2f;
+    float theta_end = 1.0e-4f;
+    float lambda = 1.0f / (1.0f + 0.5f * settings.minSceneDepth);// 1);// 1.0e-6f;
+    float beta = 0.001f;
+    int cur_iter = 1;
+    int max_iters = 1000;
+    float epsilon = settings.epsilon;
+    float sigmaQ = settings.sigmaQ;//1.0e-2f;
+    float sigmaD = settings.sigmaD;// 1.0e-2f;
+    while (theta_n > theta_end && cur_iter < max_iters)
+    {
+        qStep(updateQShader, epsilon, sigmaQ, projectQShader);
+        dStep(updateDShader, sigmaD, theta_n);
+        aStep(updateAShader, lambda, theta_n);
+        if(theta_n < 1.0e-3)    {beta = 0.0001f;}
+        theta_n *= (1.0f - beta * cur_iter);
+        cur_iter++;
+    }
+    Debug.Log("Num iterations: " + cur_iter);
+}
+
+#########
+
+[System.Serializable]
+public class DTAMSettings
+{
+    public float minSceneDepth = 1;
+    public float sigmaQ = 1.0e-2f;
+    public float sigmaD = 1.0e-2f;
+    public float alpha = 1;
+    public float beta = 2;
+    public float epsilon = 1.0e-4f;
+}
+
+
+
+
+########  initRegularizer ///////////////
+
+void initRegularizer(ComputeShader cs, float alpha, float beta)
+{
+    int kernel = cs.FindKernel("CSMain");
+    uint threadX, threadY, threadZ;
+    cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+    cs.SetInt("_width", Image.width);
+    cs.SetInt("_height", Image.height);
+    cs.SetFloat("_alpha", alpha);
+    cs.SetFloat("_beta", beta);
+    cs.SetTexture(kernel, "Intensity", Image);
+    cs.SetTexture(kernel, "Result", Regularizer);
+    cs.Dispatch( kernel, Mathf.CeilToInt( (float)Regularizer.width / (float)threadX), Mathf.CeilToInt((float)Regularizer.height / (float)threadY), (int)threadZ );
+}
+
+#######
+
+#pragma kernel CSMain
+#pragma kernel CSMain
+RWTexture2D<float4> Intensity;
+RWTexture2D<float4> Result;
+uniform int _width;
+uniform int _height;
+uniform float _alpha;
+uniform float _beta;
+
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+
+ float2 grad = 0;
+ uint2 id0_x = id.xy;
+ uint2 id0_y = id.xy;
+ uint2 id1_x = id.xy;
+ uint2 id1_y = id.xy;
+
+ if (id.x > 0) {id0_x = id.xy - uint2(1,0); }
+ if (id.x < _width - 1) {id1_x = id.xy + uint2(1, 0); }
+ if (id.y > 0) {id0_y = id.xy - uint2(0, 1); }
+ if (id.y < _height - 1) {id1_y = id.xy + uint2(0, 1); }
+
+ float4 deltaX = (Intensity[id1_x] - Intensity[id0_x]) / (float)(id1_x.x - id0_x.x);
+ float4 deltaY = (Intensity[id1_y] - Intensity[id0_y]) / (float)(id1_y.y - id0_y.y);
+
+ float gradSquared = dot(deltaX.rgb, deltaX.rgb) + dot(deltaY.rgb, deltaY.rgb);
+
+ Result[id.xy] = exp(-_alpha * pow(gradSquared,1.0/_beta));
+}
+
+
+
+
+############ initSolver //////////////
+
+void initSolver(ComputeShader cs)
+{
+int kernel = cs.FindKernel("CSMain");
+uint threadX, threadY, threadZ;
+cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+cs.SetInt("_width", AImage.width);
+cs.SetInt("_height", AImage.height);
+cs.SetInt("_depth", depth);
+cs.SetInt("_texWidth", CostVolume.width);
+cs.SetInt("_texHeight", CostVolume.height);
+cs.SetFloat("_invDepthMax", invDepthMax);
+cs.SetFloat("_invDepthMin", invDepthMin);
+cs.SetTexture(kernel, "CostVolume", CostVolume);
+cs.SetTexture(kernel, "ResultQ", QImage);
+cs.SetTexture(kernel, "ResultD", DImage);
+cs.SetTexture(kernel, "ResultA", AImage);
+cs.Dispatch(kernel, Mathf.CeilToInt((float)AImage.width / (float)threadX), Mathf.CeilToInt((float)AImage.height / (float)threadY), (int)threadZ);
+}
+
+
+#######
+
+#pragma kernel CSMain
+#pragma kernel CSMain
+RWTexture2D<float4> CostVolume;
+RWTexture2D<float4> ResultQ;
+RWTexture2D<float4> ResultD;
+RWTexture2D<float4> ResultA;
+
+uniform float _invDepthMax;
+uniform float _invDepthMin;
+
+uniform int _texWidth;
+ //texture width of cost volumeuniform int _texHeight;
+ //texture height of cost volume
+uniform int _width;
+ //width of imageuniform int _height;
+ //height of imageuniform int _depth;
+ //number of samples in inverse depth space
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+    uint stride = id.x + id.y * _width;
+    uint2 coord = uint2(stride % _texWidth, stride / _texWidth);
+
+    //initialize the search with the first depth element in the cost volume
+    float a_n = lerp(_invDepthMax, _invDepthMin, (float)0 / (float)(_depth - 1));
+    float bestResidual = CostVolume[coord].x;
+
+    //point-wise search (aka for loop over the inverse depths and compute residuals)
+    for (uint a_idx = 0; a_idx < _depth;  a_idx++, stride += _width*_height) {
+        coord = uint2(stride % _texWidth, stride / _texWidth);
+        float a_val = lerp(_invDepthMax, _invDepthMin, (float)a_idx / (float)(_depth - 1) );
+        float residual = CostVolume[coord].x;
+        if (residual <= bestResidual) {
+            bestResidual = residual;
+            a_n = a_val;
+        }
+    }
+    ResultD[id.xy] = a_n;
+    ResultA[id.xy] = a_n;
+    ResultQ[id.xy] = 0;
+}
+
+
+
+
+
+###### qstep ///////////////////////////////
+
+void qStep(ComputeShader cs, float epsilon, float sigmaQ, ComputeShader csProj)
+{
+int kernel = cs.FindKernel("CSMain");
+uint threadX, threadY, threadZ;
+cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+cs.SetInt("_width", QImage.width);
+cs.SetInt("_height", QImage.height);
+cs.SetFloat("_epsilon", epsilon);
+cs.SetFloat("_sigma_q", sigmaQ);
+cs.SetTexture(kernel, "Regularizer", Regularizer);
+cs.SetTexture(kernel, "ResultQ", QImage);
+cs.SetTexture(kernel, "ResultD", DImage);
+cs.Dispatch(kernel, Mathf.CeilToInt( (float)QImage.width / (float)threadX), Mathf.CeilToInt((float)QImage.height / (float)threadY), (int)threadZ );
+}
+
+#######
+
+#pragma kernel CSMain#pragma kernel CSMain
+RWTexture2D<float4> Regularizer;
+RWTexture2D<float4> ResultQ;
+RWTexture2D<float4> ResultD;
+
+uniform float _epsilon;
+uniform float _sigma_q;
+uniform int _width;
+uniform int _height;
+
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+ uint2 id0_x = id.xy;
+ uint2 id0_y = id.xy;
+ uint2 id1_x = id.xy;
+ uint2 id1_y = id.xy;
+ if (id.x > 0) {id0_x = id.xy - uint2(1, 0);}
+ if (id.x < _width - 1) {id1_x = id.xy + uint2(1, 0);}
+ if (id.y > 0) {id0_y = id.xy - uint2(0, 1);}
+ if (id.y < _height - 1) {id1_y = id.xy + uint2(0, 1);}
+
+ float dDdX = (ResultD[id1_x].x*Regularizer[id1_x].x - ResultD[id0_x].x*Regularizer[id0_x].x) / (float)(id1_x.x - id0_x.x);
+ float dDdY = (ResultD[id1_y].x*Regularizer[id1_y].x - ResultD[id0_y].x*Regularizer[id0_y].x) / (float)(id1_y.y - id0_y.y);
+
+ float2 AGd = float2(dDdX, dDdY);
+ float2 q_n = ResultQ[id.xy];
+
+ float2 q_n_plus_1 = (q_n + _sigma_q * AGd) / (1.0 + _sigma_q *_epsilon);   //project q_n_plus_1 to enforce the constraint ||q_n_plus_1|| <= 1
+
+ q_n_plus_1 /= max(1.0, sqrt(dot(q_n_plus_1, q_n_plus_1)));
+
+ ResultQ[id.xy] = float4(q_n_plus_1, dot(q_n_plus_1, q_n_plus_1), 0);
+}
+
+
+
+
+
+######### dstep ////////////////////////////////////
+
+void dStep(ComputeShader cs, float sigmaD, float theta)
+{
+    int kernel = cs.FindKernel("CSMain");
+    uint threadX, threadY, threadZ;
+    cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+    cs.SetInt("_width", DImage.width);
+    cs.SetInt("_height", DImage.height);
+    cs.SetFloat("_sigma_d", sigmaD);
+    cs.SetFloat("_theta_n", theta);
+    cs.SetTexture(kernel, "Regularizer", Regularizer);
+    cs.SetTexture(kernel, "ResultQ", QImage);
+    cs.SetTexture(kernel, "ResultD", DImage);
+    cs.SetTexture(kernel, "ResultA", AImage);
+    cs.Dispatch(kernel, Mathf.CeilToInt((float)DImage.width / (float)threadX), Mathf.CeilToInt((float)DImage.height / (float)threadY), (int)threadZ);
+}
+
+####
+
+#pragma kernel CSMain#pragma kernel CSMain
+RWTexture2D<float4> Regularizer;
+RWTexture2D<float4> ResultQ;
+RWTexture2D<float4> ResultD;
+RWTexture2D<float4> ResultA;
+
+uniform float _sigma_d;
+uniform float _theta_n;
+uniform int _width;
+uniform int _height;
+
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+    uint2 id0_x = id.xy;
+    uint2 id0_y = id.xy;
+    uint2 id1_x = id.xy;
+    uint2 id1_y = id.xy;
+    if (id.x > 0) { id0_x = id.xy - uint2(1, 0);}
+    if (id.x < _width - 1) {
+	id1_x = id.xy + uint2(1, 0);}
+    if (id.y > 0) {id0_y = id.xy - uint2(0, 1);}
+    if (id.y < _height - 1) {id1_y = id.xy + uint2(0, 1);}
+
+    float g = Regularizer[id.xy];
+    float Atq_n_plus_1 = (ResultQ[id1_x].x - ResultQ[id0_x].x) / (float)(id1_x.x - id0_x.x) + (ResultQ[id1_y].y - ResultQ[id0_y].y) / (float)(id1_y.y - id0_y.y);
+    // -ResultQ[id.xy].y;
+    // (ResultQ[id1_x]x - ResultQ[id0_x].x) / () float GAtq_n_plus_1 = g * Atq_n_plus_1;
+    //computes the GAtq_n_plus_1 term
+    float d_n = ResultD[id.xy].r;
+    float a_n = ResultA[id.xy].r;
+    float d_n_plus_1 = (d_n + _sigma_d * (GAtq_n_plus_1 + a_n / _theta_n)) / (1.0 + _sigma_d / _theta_n);
+    ResultD[id.xy] = d_n_plus_1;
+}
+
+
+
+####
+
+public RenderTexture CostVolumeMinMax;
+//Add this to the Initialize function
+this.CostVolumeMinMax = createRT(width, height, RenderTextureFormat.ARGBFloat);
+
+//Add this to the UpdateCostVolume() function
+public void UpdateCostVolume(SampleFrame frame, ComputeShader updateCostShader, ComputeShader updateCostMinMaxShader)
+{
+    updateCosts(frame, updateCostShader);
+    updateCostsMinMax(updateCostMinMaxShader);
+}
+
+void updateCostsMinMax(ComputeShader cs)
+{
+    int kernel = cs.FindKernel("CSMain");
+    uint threadX, threadY, threadZ;
+    cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+    cs.SetInt("_width", Image.width);
+    cs.SetInt("_height", Image.height);
+    cs.SetInt("_depth", depth);
+    cs.SetInt("_texWidth", CostVolume.width);
+    cs.SetInt("_texHeight", CostVolume.height);
+    cs.SetTexture(kernel, "CostVolume", CostVolume);
+    cs.SetTexture(kernel, "Result", CostVolumeMinMax);
+    cs.Dispatch(kernel, Mathf.CeilToInt((float)CostVolumeMinMax.width / (float)threadX), Mathf.CeilToInt((float)CostVolumeMinMax.height / (float)threadY), (int)threadZ);
+}
+
+void aStep(ComputeShader cs, float lambda, float theta)
+{
+    int kernel = cs.FindKernel("CSMain");
+    uint threadX, threadY, threadZ;
+    cs.GetKernelThreadGroupSizes(kernel, out threadX, out threadY, out threadZ);
+    cs.SetInt("_width", AImage.width);
+    cs.SetInt("_height", AImage.height);
+    cs.SetInt("_depth", depth);
+    cs.SetInt("_texWidth", CostVolume.width);
+    cs.SetInt("_texHeight", CostVolume.height);
+    cs.SetFloat("_invDepthMax", invDepthMax);
+    cs.SetFloat("_invDepthMin", invDepthMin);
+    cs.SetFloat("_lambda", lambda);
+    cs.SetFloat("_theta_n", theta);
+    cs.SetTexture(kernel, "CostVolume", CostVolume);
+    cs.SetTexture(kernel, "CostVolumeMinMax", CostVolumeMinMax);
+    cs.SetTexture(kernel, "ResultD", DImage);
+    cs.SetTexture(kernel, "ResultA", AImage);
+    cs.Dispatch(kernel, Mathf.CeilToInt((float)AImage.width / (float)threadX), Mathf.CeilToInt((float)AImage.height / (float)threadY), (int)threadZ);
+}
+
+
+
+
+####
+
+
+#pragma kernel CSMain#pragma kernel CSMain
+RWTexture2D<float4> CostVolume;
+RWTexture2D<float4> Result;
+
+uniform int _texWidth;
+ //texture width of cost volumeuniform int _texHeight;
+ //texture height of cost volume
+uniform int _width;
+ //width of imageuniform int _height;
+ //height of imageuniform int _depth;
+ //number of samples in inverse depth space
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+    uint stride = id.x + id.y * _width;
+    uint2 coord = uint2(stride % _texWidth, stride / _texWidth);
+    float minVal = CostVolume[coord].r;
+    float maxVal = CostVolume[coord].r;
+    for (uint depth_idx = 0; depth_idx < _depth; depth_idx++, stride += _width*_height) {
+        uint2 newCoord = uint2(stride % _texWidth, stride / _texWidth);
+        float4 val = CostVolume[newCoord];
+        minVal = min(val, minVal);
+        maxVal = max(val, maxVal);
+    }
+    Result[id.xy] = float4(minVal, maxVal, 0, 0);
+}
+
+
+####
+
+
+#pragma kernel CSMain
+#pragma kernel CSMain
+RWTexture2D<float4> CostVolume;
+RWTexture2D<float4> CostVolumeMinMax;
+RWTexture2D<float4> ResultD;
+RWTexture2D<float4> ResultA;
+
+uniform float _theta_n;
+uniform float _lambda;
+uniform float _invDepthMax;
+uniform float _invDepthMin;
+uniform int _texWidth;
+//texture width of cost volumeuniform int _texHeight;
+//texture height of cost volume
+uniform int _width;
+//width of imageuniform int _height;
+//height of imageuniform int _depth;
+//number of samples in inverse depth space
+
+float get_residual(float d_n, float a_val, float invTheta, uint baseStride, uint zStride){
+    float depth_idx = clamp(((a_val - _invDepthMax) / (_invDepthMin - _invDepthMax))*(float)(_depth - 1), 0, _depth-1);
+    uint d_low = (uint)floor(depth_idx);
+    uint d_high = (uint)ceil(depth_idx);
+
+    uint stride_low = baseStride + zStride * d_low;
+    uint stride_high = baseStride + zStride * d_high;
+    float lerpFactor = depth_idx - (float)d_low;
+    float cost_low = CostVolume[uint2(stride_low % _texWidth, stride_low / _texWidth)].x;
+    float cost_high = CostVolume[uint2(stride_high % _texWidth, stride_high / _texWidth)].x;
+    float cost = lerp(cost_low, cost_high, lerpFactor);
+
+    float residual = invTheta * (d_n - a_val)*(d_n - a_val) + _lambda * cost;
+    return residual;
+}
+
+float get_residual_grad(float d_n, float a_val, float invTheta, uint baseStride, uint zStride, float eps){
+    return (
+        get_residual(d_n, a_val + eps * 0.5, invTheta, baseStride, zStride)
+        - get_residual(d_n, a_val - eps * 0.5, invTheta, baseStride, zStride)
+    ) / eps;
+}
+
+float get_residual_second_order(float d_n, float a_val, float invTheta, uint baseStride, uint zStride, float eps){
+    return (
+        get_residual(d_n, a_val + eps, invTheta, baseStride, zStride)
+        + get_residual(d_n, a_val - eps, invTheta, baseStride, zStride)
+        - 2 * get_residual(d_n, a_val, invTheta, baseStride, zStride)
+    ) / (eps*eps);
+}
+
+[numthreads(8,8,1)]void CSMain (uint3 id : SV_DispatchThreadID){
+    uint baseStride = id.x + id.y * _width;
+    uint zStride = _width*_height;
+
+    float invTheta = 0.5 / _theta_n;        //the (1.0/(2*theta)) term
+    float d_n = ResultD[id.xy];
+
+    //initialize the search with the first depth element in the cost volume
+    float a_n_plus_1 = lerp(_invDepthMax, _invDepthMin, (float)0 / (float)(_depth - 1));
+    float bestResidual = get_residual(d_n, a_n_plus_1, invTheta, baseStride, zStride);
+
+    float d_extent = 2.0 * _theta_n * (CostVolumeMinMax[id.xy].y - CostVolumeMinMax[id.xy].x);
+
+    //point-wise search (aka for loop over the inverse depths and compute residuals)
+    for(float a_idx = 0; a_idx < _depth; a_idx += 1) {
+        float a_val    = lerp(d_n - d_extent, d_n + d_extent, (float)a_idx / (float)(_depth - 1));
+        float residual = get_residual(d_n, a_val, invTheta, baseStride, zStride);
+
+        if (residual < bestResidual) {
+            bestResidual = residual;
+            a_n_plus_1 = a_val;
+        }
+    }
+    float eps = 1.0e-6*d_extent;
+    float denom = get_residual_second_order(d_n, a_n_plus_1, invTheta, baseStride, zStride, eps);
+    if (abs(denom) > 1.0e-9) {
+        float newtonStep = get_residual_grad(d_n, a_n_plus_1, invTheta, baseStride, zStride, eps) / denom;
+        a_n_plus_1 -= newtonStep;
+    }
+    ResultA[id.xy] = a_n_plus_1;
+}

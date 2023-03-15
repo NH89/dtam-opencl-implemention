@@ -30,16 +30,13 @@ public:
 		 );
 	RunCL   cvrc;
 	FrameID fid;
-	int     rows, cols, layers, count, QDruncount, Aruncount;
+	int     rows, cols, layers, count;
 	//near & far : inverse depth of center of voxels in layer layers-1 //inverse depth of center of voxels in layer 0
 	float   near, far,  depthStep, initialWeight, occlusionThreshold;
 	Matx44f K, inv_K, pose, inv_pose;
 	Mat R, T, cameraMatrix, projection;					//Note! should be in OpenCV format
 	Mat baseImage, baseImageGray, costdata, hit;  		//projects world coordinates (x,y,z) into (rows,cols,layers)
 	Mat _qx, _qy, _d, _a, _g, _g1, _gx, _gy, lo, hi;
-	/*
-    //cv::Mat _qx, _qy, _d, _a, _g, _gu, _gd, _gl, _gr, _gbig;
-    */
 
 	void updateCost(const cv::Mat& image,  const cv::Mat& R,  const cv::Mat& T);		//Accepts pinned RGBA8888 or BGRA8888 for high speed
 	void cacheGValues();
@@ -48,12 +45,8 @@ public:
 	void updateQD();
 	bool updateA();
 	void GetResult();
-	/*
-	//void optimizeQD();
-	//bool optimizeA();
-    */
 
-	void computeSigmas(float epsilon, float theta){
+	void computeSigmas(float epsilon, float theta);/*{
 		float lambda, alpha, gamma, delta, mu, rho, sigma;
 		float L = 4;	//lower is better(longer steps), but in theory only >=4 is guaranteed to converge. For the adventurous, set to 2 or 1.44
 		lambda  = 1.0 / theta;
@@ -65,7 +58,7 @@ public:
 		sigma   = mu / (2.0*delta);
 		sigma_d = rho;
 		sigma_q = sigma;
-	}
+	}*/
 
 private:
 	cv::Mat cBuffer;	//Must be pagable
@@ -73,7 +66,4 @@ private:
 	void  solveProjection(const cv::Mat& R,  const cv::Mat& T);
 	void  checkInputs(    const cv::Mat& R,  const cv::Mat& T,   const cv::Mat& _cameraMatrix);
 	float old_theta, theta, thetaStart, thetaStep, thetaMin, epsilon, lambda, sigma_d, sigma_q;
-	float alloced, cachedG, dInited;
-	//void cacheGValues();
 };
-

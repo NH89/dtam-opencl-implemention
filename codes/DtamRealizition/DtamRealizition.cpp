@@ -114,7 +114,7 @@ int main()
 			cv.updateQD();													// Optimize Q, D   (primal-dual)
 		doneOptimizing = cv.updateA();										// Optimize A      (pointwise exhaustive search)
 		opt_count ++;
-	} while (!doneOptimizing && (opt_count<60));
+	} while (!doneOptimizing && (opt_count<60));  //60
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;

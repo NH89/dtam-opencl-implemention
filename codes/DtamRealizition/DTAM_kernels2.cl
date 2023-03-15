@@ -212,8 +212,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
  __kernel void UpdateQD(
 	 __global float* g1pt,
 	 __global float* qpt,
-	 __global float* dpt,                           // dmem,     depth D
-	 __global float* apt,                           // amem,     auxilliary A
+	 __global float* dpt,                           	// dmem,     depth D
+	 __global float* apt,                           	// amem,     auxilliary A
 	 __constant float* params
 	 )
  {
@@ -227,7 +227,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 	 int y = g_id / cols;
 	 int x = g_id % cols;
-	 unsigned int pt = x + y * cols;               // index of this pixel
+	 unsigned int pt = x + y * cols;					// index of this pixel
 	 barrier(CLK_GLOBAL_MEM_FENCE);
 	 const int wh = (cols*rows);
 
@@ -237,64 +237,61 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 float d  = dpt[pt];
 	 float a  = apt[pt];
 
-	 const float dd_x = (x==cols-1)? 0.0f : dpt[pt+1]    - d;			// Sample depth gradient in x&y
+	 const float dd_x = (x==cols-1)? 0.0f : dpt[pt+1]    - d;	// Sample depth gradient in x&y
 	 const float dd_y = (y==rows-1)? 0.0f : dpt[pt+cols] - d;
-	 // DTAM paper, primal-dual update step
 
-	 qx = (qx + sigma_q*g1*dd_x) / (1.0f + sigma_q*epsilon);
-	 qy = (qy + sigma_q*g1*dd_y) / (1.0f + sigma_q*epsilon);
+	 qx = (qx + sigma_q*g1*dd_x) / (1.0f + sigma_q*epsilon);	// DTAM paper, primal-dual update step
+	 qy = (qy + sigma_q*g1*dd_y) / (1.0f + sigma_q*epsilon);	// sigma_q=0.0559017,  epsilon=0.1
 	 const float maxq = fmax(1.0f, sqrt(qx*qx + qy*qy));
+	 qx 		= qx/maxq;
+	 qy 		= qy/maxq;
+	 qpt[pt]    = qx;  									//dd_x;//pt2;//wh;//pt;//dd_x;//qx / maxq;
+	 qpt[pt+wh] = qy;  									//dd_y;//pt;//;//y;//dd_y;//dpt[pt+1] - d; //dd_y;//qy / maxq;
 
-	 qx = qx/maxq;
-	 qy = qy/maxq;
+	 barrier(CLK_GLOBAL_MEM_FENCE);						// needs to be after all Q updates.
 
-	 qpt[pt]    = qx;  //dd_x;//pt2;//wh;//pt;//dd_x;//qx / maxq;
-	 qpt[pt+wh] = qy;  //dd_y;//pt;//;//y;//dd_y;//dpt[pt+1] - d; //dd_y;//qy / maxq;
-
-	 barrier(CLK_GLOBAL_MEM_FENCE);						// needs to be after all Q updates. TODO ? is this fence sufficient ?
-	 float dqx_x;// = div_q_x(q, w, x, i);											// div_q_x(..)
+	 float dqx_x;										// = div_q_x(q, w, x, i);				// div_q_x(..)
 	 if (x == 0) dqx_x = qx;
 	 else if (x == cols-1) dqx_x =  -qpt[pt-1];
 	 else dqx_x =  qx- qpt[pt-1];
 
-	 float dqy_y;// = div_q_y(q, w, h, wh, y, i);										// div_q_y(..)
+	 float dqy_y;										// = div_q_y(q, w, h, wh, y, i);		// div_q_y(..)
 	 if (y == 0) dqy_y =  qy;							// return q[i];
 	 else if (y == rows-1) dqy_y = -qpt[pt+wh-cols];	// return -q[i-1];
 	 else dqy_y =  qy - qpt[pt+wh-cols];				// return q[i]- q[i-w];
 
 	 const float div_q = dqx_x + dqy_y;
 
-	 dpt[pt] = (d + sigma_d*(g1*div_q + a/theta)) / (1.0f + sigma_d/theta);
+	 dpt[pt] = (d + sigma_d * (g1*div_q + a/theta)) / (1.0f + sigma_d/theta);
 
-	 if (x==100 && y==100) printf("\ndpt[pt]=%f, d=%f, sigma_d=%f, g1=%f, div_q=%f, a=%f, theta=%f, sigma_d=%f, theta=%f : qx=%f, qy=%f, maxq=%f, dd_x=%f, dd_y=%f ", dpt[pt], d, sigma_d, g1, div_q , a, theta, sigma_d, theta, qx, qy, maxq, dd_x, dd_y );
+	 if (x==100 && y==100) printf("\ndpt[pt]=%f, d=%f, sigma_q=%f, epsilon=%f, g1=%f, div_q=%f, a=%f, theta=%f, sigma_d=%f, qx=%f, qy=%f, maxq=%f, dd_x=%f, dd_y=%f ", \
+		 dpt[pt], d, sigma_q, epsilon, g1, div_q , a, theta, sigma_d, qx, qy, maxq, dd_x, dd_y );
  }
 
-// 					( inverse_depth, r , min_inv_depth, inv_depth_step, num_layers )
-int set_start_layer(float di, float r, float far, float depthStep, int layers, int x, int y){
+
+int set_start_layer(float di, float r, float far, float depthStep, int layers, int x, int y){ //( inverse_depth, r , min_inv_depth, inv_depth_step, num_layers )
     const float d_start = di - r;
-    const int start_layer =  floor( (d_start - far)/depthStep )    ;  //floor((d_start - far)/depthStep) - 1;
-	//if (x==200 && y==200) printf("\n# start_layer=%i, d_start=%f, di=%f, r=%f, far=%f, depthStep=%f", start_layer, d_start, di, r, far, depthStep );
-    return (start_layer<0)? 0 : start_layer;		// start_layer >= 0
+    const int start_layer =  floor( (d_start - far)/depthStep );
+    return (start_layer<0)? 0 : start_layer;
 }
 
 int set_end_layer(float di, float r, float far, float depthStep, int layers, int x, int y){
     const float d_end = di + r;
-    const int end_layer = ceil((d_end - far)/depthStep) + 1;        // lrintf = Round input to nearest integer value
-    // int end_layer = 255;// int layer = int((d_end - far)/depthStep) + 1;
-    //if (x==200 && y==200) printf("\n# end_layer=%i", end_layer );
-    return  (end_layer>(layers-1))? (layers-1) : end_layer;			// end_layer <= layers-1
+    const int end_layer = ceil((d_end - far)/depthStep) + 1;
+    return  (end_layer>(layers-1))? (layers-1) : end_layer;
 }
 
 float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, float lambda, float scale_Eaux, float costval)
 {
 	const float ai = far + aIdx*depthStep;
 	return scale_Eaux*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
-
+	/*
 	// return (0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
 	// return 100*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
 	// return 10000*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
 	// return 1000000*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
 	// return 10000000*(0.5f/theta)*((di-ai)*(di-ai)) + lambda*costval;
+	*/
 }
 
 
@@ -314,8 +311,8 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 unsigned int layer_step = floor(params[pixels_]);
 	 float lambda			= params[lambda_];
 	 float theta			= params[theta_];
-	 float min_d			= params[max_inv_depth_]; //far
-	 float max_d			= params[min_inv_depth_]; //near
+	 float max_d			= params[max_inv_depth_]; //near
+	 float min_d			= params[min_inv_depth_]; //far
 	 float scale_Eaux		= params[scale_Eaux_];
 
 	 int y = x / cols;
@@ -335,8 +332,8 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 const int   layerStep = rows*cols;
 
 	 const float r = sqrt( 2*theta*lambda*(hi[pt] - lo[pt]) );
-	 const int start_layer = set_start_layer(d, r, min_d, depthStep, layers, x, y);  // 0;//
-	 const int end_layer   = set_end_layer(d, r, min_d, depthStep, layers, x, y);  // layers-1; //
+	 const int start_layer = set_start_layer(d, r, max_d, depthStep, layers, x, y);  // 0;//
+	 const int end_layer   = set_end_layer  (d, r, max_d, depthStep, layers, x, y);  // layers-1; //
 	 int minl = 0;
 	 float Eaux_min = 1e+30; // set high initial value
 
@@ -366,6 +363,6 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	*/
 	apt[pt] = a;
 
-	if (x==200 && y==200) printf("\n\nUpdateA: theta=%f, lambda=%f, hi=%f, lo=%f, r=%f, d=%f, min_d=%f, depthStep=%f, layers=%i, start_layer=%i, end_layer=%i", \
-		theta, lambda, hi[pt], lo[pt], r, d, min_d, depthStep, layers, start_layer, end_layer );
+	if (x==200 && y==200) printf("\n\nUpdateA: theta=%f, lambda=%f, hi=%f, lo=%f, r=%f, d=%f, min_d=%f, max_d=%f, minl=%f, depthStep=%f, layers=%i, start_layer=%i, end_layer=%i", \
+		theta, lambda, hi[pt], lo[pt], r, d, min_d, max_d, minl, depthStep, layers, start_layer, end_layer );
  }

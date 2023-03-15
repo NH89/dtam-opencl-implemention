@@ -281,24 +281,14 @@ CostVol::CostVol(
 	baseImageGray 	= baseImageGray.reshape(0, rows);		// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
 
     count      = 0;
-	//float off  = layers / 32;
-
-
-
-	thetaStart = 0.1;//0.2;		//200.0*off;					// DTAM paper & DTAM_Mapping has Theta_start = 0.2
+	thetaStart = 0.2;//0.2;		//200.0*off;					// DTAM paper & DTAM_Mapping has Theta_start = 0.2
 	//thetaMin   = 9.9e-8;	//1.0e-4;	//1.0*off;			// DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
-	thetaStep  = 0.87;      //0.97;
+	thetaStep  = 0.87;      //0.97;  //
 	epsilon    = 1.0e-4;	//.1*off;
-	lambda     = 1.0;		//.001 / off;					// DTAM paper: lambda = 1 for 1st key frame, and 1/(1+0.5*min_depth) thereafter
+	lambda     = 1.0;	//1.0;		//.001 / off;					// DTAM paper: lambda = 1 for 1st key frame, and 1/(1+0.5*min_depth) thereafter
 	theta      = thetaStart;
 	old_theta  = theta;
 
-	QDruncount = 0;
-	Aruncount  = 0;
-
-	alloced = 0;
-	cachedG = 0;
-	dInited = 0;
 
 	// lambda, theta, sigma_d, sigma_q set by CostVol::computeSigmas(..) in CostVol.h, called in CostVol::updateQD() below.
 	computeSigmas(epsilon, theta);
@@ -312,6 +302,20 @@ CostVol::CostVol(
 	cvrc.params[SCALE_EAUX]		=  10000;		// from DTAM_Mapping input/json/icl_numin.json    //1.0;
 	cout << "CostVol_chk 6\n" << flush;
 }
+
+void CostVol::computeSigmas(float epsilon, float theta){
+		float lambda, alpha, gamma, delta, mu, rho, sigma;
+		float L = 4;	//lower is better(longer steps), but in theory only >=4 is guaranteed to converge. For the adventurous, set to 2 or 1.44
+		lambda  = 1.0 / theta;
+		alpha   = epsilon;
+		gamma   = lambda;
+		delta   = alpha;
+		mu      = 2.0*std::sqrt(gamma*delta) / L;
+		rho     = mu / (2.0*gamma);
+		sigma   = mu / (2.0*delta);
+		sigma_d = rho;
+		sigma_q = sigma;
+	}
 
 void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T) 
 {
@@ -456,7 +460,6 @@ bool CostVol::updateA()
 		cacheGValues();
 		old_theta=theta;
 	}
-
 	cout<<"\nCostVol::updateA_chk0, "<<flush;
 	// bool doneOptimizing = (theta <= thetaMin);
 
@@ -465,8 +468,8 @@ bool CostVol::updateA()
 	
 	cout<<"\nCostVol::updateA_chk2, "<<flush;
 	theta *= thetaStep;
-
 	//return doneOptimizing;
+	return false;
 }
 
 void CostVol::GetResult()
@@ -474,13 +477,7 @@ void CostVol::GetResult()
 	cout<<"\nCostVol::GetResult_chk0"<<flush;
 	cvrc.ReadOutput(_a.data); // (float*)
 
-	// DownloadAndSave(dmem,	  (count ), paths.at("dmem"), 	  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ false );
-	// void RunCL::DownloadAndSave(cl_mem buffer,  int count,  boost::filesystem::path folder,  size_t image_size_bytes,  cv::Size size_mat,  int type_mat,  bool show )
-	// ReadOutput(temp_mat.data, buffer,  image_size_bytes);
-	// cvrc.ReadOutput(_a.data, dmem, image_size_bytes );
-
 	cout<<"\nCostVol::GetResult_chk1"<<flush;
 	cvrc.CleanUp();
-
 	cout<<"\nCostVol::GetResult_chk2_finished"<<flush;
 }
