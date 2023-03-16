@@ -13,6 +13,7 @@ using namespace cv;
 using namespace std;
 int main()
 {
+	//verbosity = 1; // -1= none, 0=errors only, 1=basic, 2=lots.
 	cout << "\n main_chk 0\n" << flush;
 	int numImg 			= 50;
 	int imagesPerCV 	= 30;

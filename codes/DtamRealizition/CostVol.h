@@ -14,9 +14,6 @@ typedef size_t  st;
 #define gleft   gl[here]
 #define gright  gr[here]
 
-
-
-
 class CostVol
 {
 public:

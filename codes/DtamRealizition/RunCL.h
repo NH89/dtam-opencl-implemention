@@ -1,7 +1,8 @@
-#pragma once
-//#include <CL/cl.h>  // included via <CL/cl.hpp> & CL/opencl.h
-#include <CL/cl.hpp>
+//#pragma once
+#ifndef RUNCL_H
+#define RUNCL_H
 
+#include <CL/cl.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
@@ -9,86 +10,85 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
-
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
-
-// indices for float params passed to __const params_buf
-#define PIXELS			0  // Can these be #included from a common header for both host and device code?
+							// indices for float params passed to __const params_buf
+#define PIXELS			0	// TODO Can these be #included from a common header for both host and device code?
 #define ROWS			1
 #define COLS			2
 #define LAYERS			3
 #define MAX_INV_DEPTH	4
 #define MIN_INV_DEPTH	5
 #define INV_DEPTH_STEP	6
-#define ALPHA_G		7
-#define BETA_G			8	///  __kernel void CacheG4
-#define EPSILON 		9	///  __kernel void UpdateQD		// epsilon = 0.1
+#define ALPHA_G			7
+#define BETA_G			8	//  __kernel void CacheG4
+#define EPSILON 		9	//  __kernel void UpdateQD		// epsilon = 0.1
 #define SIGMA_Q 		10									// sigma_q = 0.0559017
 #define SIGMA_D 		11
 #define THETA			12
-#define LAMBDA			13	///   __kernel void UpdateA2
+#define LAMBDA			13	//   __kernel void UpdateA2
 #define SCALE_EAUX		14
 
+#define verbosity		1	// -1= none, 0=errors only, 1=basic, 2=lots.
 
 using namespace std;
 class RunCL
 {
 public:
-	RunCL(boost::filesystem::path out_path);
-	
 	std::vector<cl_platform_id> m_platform_ids;
-	cl_context                  m_context;
-	cl_device_id                m_device_id;
-	cl_command_queue            m_queue;
-	cl_program                  m_program;
-	//cl_kernel  cost_kernel, min_kernel, optiQ_kernel, optiD_kernel, optiA_kernel;
-	cl_kernel cost_kernel, cache3_kernel, cache4_kernel, updateQD_kernel, updateA_kernel;
-	// cache1_kernel, cache2_kernel, updateQ_kernel, updateD_kernel, initializeAD_kernel,
-	cl_mem basemem, imgmem, cdatabuf, hdatabuf, k2kbuf, dmem, amem; // gdmem, gumem, glmem, grmem, qxmem, qymem, pbuf, kbuf, rtbuf,
-	cl_mem basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem;  // gqxmem, gqymem,
-	cl_mem param_buf;	//__constant float* params) // pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step, threshold
-	size_t  global_work_size, local_work_size;
-	bool gpu;
-	bool amdPlatform;     
-	cl_device_id deviceId;  
-	
+	cl_context			m_context;
+	cl_device_id		m_device_id;
+	cl_command_queue	m_queue;
+	cl_program			m_program;
+	cl_kernel			cost_kernel, cache3_kernel, cache4_kernel, updateQD_kernel, updateA_kernel;
+	cl_mem				basemem, imgmem, cdatabuf, hdatabuf, k2kbuf, dmem, amem, basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem, param_buf;
 
-
-	float params[16] = {0};
-	int width, height, costVolLayers;
-	int count=0, keyFrameCount=0, costVolCount=0, QDcount=0, A_count=0;
-
-	size_t image_size_bytes;
-	cv::Size baseImage_size;
-	int baseImage_type;
-
+	size_t  			global_work_size, local_work_size, image_size_bytes;
+	bool 				gpu, amdPlatform;
+	cl_device_id 		deviceId;
+	float 				params[16] = {0};
+	int 				width, height, costVolLayers, baseImage_type, count=0, keyFrameCount=0, costVolCount=0, QDcount=0, A_count=0;
+	cv::Size 			baseImage_size;
 	std::map< std::string, boost::filesystem::path > paths;
-	void createFolders(boost::filesystem::path out_path); // NB called by RunCL(..) constructor, above.
 
-	int  convertToString(const char *filename, std::string& s)
-	{
+	RunCL(boost::filesystem::path out_path);
+	void createFolders(boost::filesystem::path out_path); // NB called by RunCL(..) constructor, above.
+	void saveCostVols();
+	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show, float max_range );
+	void DownloadAndSave_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder_tiff, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
+	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
+
+	void allocatemem(float* gx, float* gy, float* params, int layers, cv::Mat &baseImage, float *cdata, float *hdata); 			/*float *qx, float *qy,*/
+	void calcCostVol(float* k2k, cv::Mat &image); 						/*cv::Mat &baseImage,*/ /*float thresh, int layers*/ /*, float *cdata, float *hdata*/
+	void cacheGValue2(cv::Mat &bgray, float theta);
+	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
+	void updateA(int layers, float lambda, float theta);
+
+	void CleanUp();
+	void exit_(cl_int res);
+	~RunCL();
+
+	//void DownloadAndSaveVolume_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
+	//void initializeCostVol(float* k2k, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
+	//void initializeAD();
+
+	int  convertToString(const char *filename, std::string& s){
 		size_t size;
 		char*  str;
 		std::fstream f(filename, (std::fstream::in | std::fstream::binary));
-
-		if (f.is_open())
-		{
+		if (f.is_open() ) {
 			size_t fileSize;
 			f.seekg(0, std::fstream::end);
 			size = fileSize = (size_t)f.tellg();
 			f.seekg(0, std::fstream::beg);
 			str = new char[size + 1];
-			if (!str)
-			{
+			if (!str) {
 				f.close();
 				return 0;
 			}
-
 			f.read(str, fileSize);
 			f.close();
 			str[size] = '\0';
@@ -99,17 +99,6 @@ public:
 		cout << "Error: failed to open file\n:" << filename << endl;
 		return 1;
 	}
-
-	void saveCostVols();
-	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show, float max_range );
-	void DownloadAndSave_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder_tiff, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
-	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
-	void DownloadAndSaveVolume_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
-	void calcCostVol(/*float* k, float* rt*/ float* k2k, cv::Mat &baseImage, cv::Mat &image, float *cdata, float *hdata, float thresh, int layers);
-	void cacheGValue2(cv::Mat &bgray, float theta);
-	//void initializeAD();
-	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
-	void updateA(int layers, float lambda, float theta);
 
 	int waitForEventAndRelease(cl_event *event){
 		cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
@@ -225,12 +214,9 @@ public:
 			default:										return "unknown CV_type code";
 		}
 	}
-	
-	void allocatemem(float *qx, float *qy, float* gx, float* gy, float* params);
 
-	void ReadOutput(uchar* outmat) {  // cvrc.ReadOutput(_a.data, dmem, image_size_bytes );
-		// DownloadAndSave(dmem, (keyFrameCount*1000 + costVolCount), paths.at("dmem"),  width * height * sizeof(float), baseImage_size, CV_32FC1, /*show=*/ true );
-		ReadOutput(outmat, amem,  (width * height * sizeof(float)) );  // NB amem initially holds naive inverse depth estimate.
+	void ReadOutput(uchar* outmat) {
+		ReadOutput(outmat, amem,  (width * height * sizeof(float)) );
 	}
 
 	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size, size_t offset=0) {
@@ -253,10 +239,6 @@ public:
 		status = clWaitForEvents(1, &readEvt); if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status=" << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
 		status = clFinish(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="		<<status<<" "<<checkerror(status)  <<"\n"<<flush; exit_(status);}
 	}
-
-	void CleanUp();
-
-	void exit_(cl_int res);
-
-	~RunCL();
 };
+
+#endif /*RUNCL_H*/
