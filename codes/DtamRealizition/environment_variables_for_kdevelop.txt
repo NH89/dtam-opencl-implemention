@@ -1,0 +1,11 @@
+// These are the environment variables that I use on Kdevelop on my workstation, to build & run dtam_opencl.
+
+COLLECT_GCC_OPTIONS='-E' '-v' '-o' '/dev/null' '-mtune=generic' '-march=x86-64'
+COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/
+CPATH=/usr/local/cuda/include:/usr/local/include:/usr/include/x86_64-linux-gnu/c++/11:/usr/include/c++/11:
+C_INCLUDE_PATH=/usr/local/cuda/include:/usr/local/include:/usr/include:
+C_PLUS_INCLUDE_PATH=/usr/local/cuda/include:/usr/local/include:/usr/include/x86_64-linux-gnu/c++/11:/usr/include/c++/11/tr1:/usr/include/c++/11:
+LD_LIBRARY_PATH=$LIBRARY_PATH:/opt/rocm/opencl/lib
+LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/
+
+
