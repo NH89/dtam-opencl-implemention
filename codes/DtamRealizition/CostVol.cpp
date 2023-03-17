@@ -52,8 +52,6 @@ void CostVol::solveProjection(const cv::Mat& R, const cv::Mat& T) {
 	projection = originShift*projection;	//put the origin at 1/z_ from_camera_center = far.   NB main() line 113, costvol constructor, far=0.0 .
 	projection.row(2) /= depthStep;			//stretch inverse depth so now   x_cam,y_cam,z_cam-->x_cv_px, y_cv_px , [1/z_from_camera_center - far]_px
 	projection = projection*P;				//projection now goes     x_world,y_world,z_world -->x_cv_px, y_cv_px , [1/z_from_camera_center - far]_px
-
-							  // exit(0);
 }
 
 void CostVol::checkInputs(
@@ -99,8 +97,6 @@ CostVol::CostVol(
 ) : cvrc(out_path), initialWeight(initialWeight), occlusionThreshold(occlusionThreshold), R(R), T(T)  // constructors for member classes //
 {
 	if(verbosity>0) cout << "CostVol_chk 0\n" << flush;
-	// New code to
-	// K, inv_K, pose, inv_pose,
 	/*
 	 *  Inverse of a transformation matrix:
 	 * http://www.info.hiroshima-cu.ac.jp/~miyazaki/knowledge/teche0053
@@ -237,11 +233,11 @@ CostVol::CostVol(
 	cvrc.params[LAYERS] 		= layers;
 	cvrc.params[MAX_INV_DEPTH] 	= near;
 	cvrc.params[MIN_INV_DEPTH] 	= far;
-	cvrc.params[INV_DEPTH_STEP] = (cvrc.params[MAX_INV_DEPTH] - cvrc.params[MIN_INV_DEPTH])/(cvrc.params[LAYERS] -1);
+	cvrc.params[INV_DEPTH_STEP] = (cvrc.params[MAX_INV_DEPTH] - cvrc.params[MIN_INV_DEPTH])/(cvrc.params[LAYERS]);
 
 	cameraMatrix = _cameraMatrix.clone();
 	solveProjection(R, T);									// solve projection
-	if(verbosity>1) {
+	if(verbosity>0) {
 		cout << "CostVol_chk 1.2 \n";
 		cout<< "layers="<<cvrc.params[LAYERS]<<",\tcvrc.params[INV_DEPTH_STEP]="<< cvrc.params[INV_DEPTH_STEP];
 		cout<<"=("<<cvrc.params[MAX_INV_DEPTH]<<" - "<< cvrc.params[MIN_INV_DEPTH] <<") / ("<< cvrc.params[LAYERS] <<" -1 )\n" << flush;
@@ -257,19 +253,12 @@ CostVol::CostVol(
 	FLATALLOC(_d);
 	FLATALLOC(_gx);
 	FLATALLOC(_gy);
-	//FLATALLOC(_qx);
-    //FLATALLOC(_qy);
     FLATALLOC(_g1);
-    
-	//_qx = _qy   = 0;
 	_gx = _gy   = 1;
 	cvrc.width  = cols;
 	cvrc.height = rows;
 
 	image.copyTo(baseImage);
-	cvrc.allocatemem( (float*)_gx.data, (float*)_gy.data, cvrc.params, layers, baseImage, (float*)costdata.data, (float*)hit.data);	/*(float*)_qx.data, (float*)_qy.data,*/
-
-	//baseImage 		= baseImage.reshape(0, rows); 								// redundant, given that rows = baseImage.rows
 	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
 	baseImageGray 	= baseImageGray.reshape(0, rows);							// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
 
@@ -291,12 +280,14 @@ CostVol::CostVol(
 	cvrc.params[THETA]			=  theta;
 	cvrc.params[LAMBDA]			=  lambda;		///   __kernel void UpdateA2
 	cvrc.params[SCALE_EAUX]		=  10000;		// from DTAM_Mapping input/json/icl_numin.json    //1.0;
+
+	cvrc.allocatemem( (float*)_gx.data, (float*)_gy.data, cvrc.params, layers, baseImage, (float*)costdata.data, (float*)hit.data);
 	if(verbosity>0) cout << "CostVol_chk 6\n" << flush;
 }
 
 void CostVol::computeSigmas(float epsilon, float theta){
 		float lambda, alpha, gamma, delta, mu, rho, sigma;
-		float L = 4;	//lower is better(longer steps), but in theory only >=4 is guaranteed to converge. For the adventurous, set to 2 or 1.44
+		float L = 4;							//lower is better(longer steps), but in theory only >=4 is guaranteed to converge. For the adventurous, set to 2 or 1.44
 		lambda  = 1.0 / theta;
 		alpha   = epsilon;
 		gamma   = lambda;
@@ -410,61 +401,45 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 		cout<<"///////////////////////////////////////////////"<<flush;
 	}
 	if(verbosity>0) cout << "\nupdateCost chk4," << flush;
-	assert(baseImage.isContinuous() ); // TODO move these assertions to the constructor ?
+	assert(baseImage.isContinuous() ); 													// TODO move these assertions to the constructor ?
 	assert(lo.isContinuous() );
 	assert(hi.isContinuous() );
 	image = image.reshape(0, rows);									// line 85: rows = image.rows, i.e. num rows in the base image. If the parameter is 0, the number of channels remains the same
 	float k2k[16];
 	for (int i=0; i<16; i++) { k2k[i] = cam2cam.operator()(i/4, i%4); }
 
-	cvrc.calcCostVol(k2k, image);	/*baseImage,*/ /*, (float*)costdata.data, (float*)hit.data, occlusionThreshold, layers*/	// calls calcCostVol(..) #################
+	cvrc.calcCostVol(k2k, image);														// calls calcCostVol(..) #################
 	if(verbosity>0) cout << "\nupdateCost chk5_finished\n" << flush;
 }
 
 void CostVol::cacheGValues()
 {
-	cout<<"\nCostVol::cacheGValues()"<<flush;
-	cout<<"\nbaseImageGray.empty()="<<baseImageGray.empty()<<flush;
-	cout<<"\nbaseImageGray.size="<<baseImageGray.size<<flush;
-
+	if(verbosity>1) {cout<<"\nCostVol::cacheGValues() \nbaseImageGray.empty()="<<baseImageGray.empty()<<" \nbaseImageGray.size="<<baseImageGray.size<<flush;}
 	cvrc.cacheGValue2(baseImageGray, theta);
 }
 
 void CostVol::updateQD()
-{
-	cout<<"\nupdateQD_chk0, epsilon="<<epsilon<<" theta="<<theta<<flush; // but if theta falls below 0.001, then G must be recomputed.
-	computeSigmas(epsilon, theta);
-
-	cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
-	cvrc.updateQD(epsilon, theta, sigma_q, sigma_d);
-
-	cout<<"\nupdateQD_chk3, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
+{														if(verbosity>1) cout<<"\nupdateQD_chk0, epsilon="<<epsilon<<" theta="<<theta<<flush;
+	computeSigmas(epsilon, theta);						if(verbosity>1) cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
+	cvrc.updateQD(epsilon, theta, sigma_q, sigma_d);	if(verbosity>1) cout<<"\nupdateQD_chk3, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
 }
 
 bool CostVol::updateA()
 {
-	if (theta < 0.001 && old_theta > 0.001){
-		cacheGValues();
-		old_theta=theta;
-	}
-	cout<<"\nCostVol::updateA_chk0, "<<flush;
+	if(verbosity>1) cout<<"\nCostVol::updateA "<<flush;
+	if (theta < 0.001 && old_theta > 0.001){  cacheGValues(); old_theta=theta; }		// If theta falls below 0.001, then G must be recomputed.
 	// bool doneOptimizing = (theta <= thetaMin);
-
-	cout<<"\nCostVol::updateA_chk1, "<<flush;
 	cvrc.updateA(layers,lambda,theta);
-	
-	cout<<"\nCostVol::updateA_chk2, "<<flush;
 	theta *= thetaStep;
 	//return doneOptimizing;
+	if(verbosity>1) cout<<"\nCostVol::updateA finished"<<flush;
 	return false;
 }
 
 void CostVol::GetResult()
 {
-	cout<<"\nCostVol::GetResult_chk0"<<flush;
-	cvrc.ReadOutput(_a.data); // (float*)
-
-	cout<<"\nCostVol::GetResult_chk1"<<flush;
+	if(verbosity>1) cout<<"\nCostVol::GetResult"<<flush;
+	cvrc.ReadOutput(_a.data);
 	cvrc.CleanUp();
-	cout<<"\nCostVol::GetResult_chk2_finished"<<flush;
+	if(verbosity>1) cout<<"\nCostVol::GetResult_finished"<<flush;
 }

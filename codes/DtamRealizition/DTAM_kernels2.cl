@@ -1,18 +1,16 @@
 /*
 // the data in float p[] , set in RunCL.cpp,    void RunCL::calcCostVol(...),   variables declared in RunCL.h  class RunCL{...}
-//  res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem),    &pbuf);
+//  res = clSetKernelArg(cost_kernel, 0, sizeof(cl_mem),    &k2kbuf);
 //  res = clSetKernelArg(cost_kernel, 1, sizeof(cl_mem),    &basemem);
 //  res = clSetKernelArg(cost_kernel, 2, sizeof(cl_mem),    &imgmem);
 //  res = clSetKernelArg(cost_kernel, 3, sizeof(cl_mem),    &cdatabuf);
 //  res = clSetKernelArg(cost_kernel, 4, sizeof(cl_mem),    &hdatabuf);
-//  res = clSetKernelArg(cost_kernel, 5, sizeof(int),       &layerstep);
-//  res = clSetKernelArg(cost_kernel, 6, sizeof(float),     &thresh);
-//  res = clSetKernelArg(cost_kernel, 7, sizeof(int),       &width);
-//  res = clSetKernelArg(cost_kernel, 8, sizeof(cl_mem),    &lomem);
-//  res = clSetKernelArg(cost_kernel, 9, sizeof(cl_mem),    &himem);
-//  res = clSetKernelArg(cost_kernel, 10, sizeof(cl_mem),   &amem);
-//  res = clSetKernelArg(cost_kernel, 11, sizeof(cl_mem),   &dmem);
-//  res = clSetKernelArg(cost_kernel, 12, sizeof(int),      &layers);
+
+//  res = clSetKernelArg(cost_kernel, 5, sizeof(cl_mem),    &lomem);
+//  res = clSetKernelArg(cost_kernel, 6, sizeof(cl_mem),    &himem);
+//  res = clSetKernelArg(cost_kernel, 7, sizeof(cl_mem),    &amem);
+//  res = clSetKernelArg(cost_kernel, 8, sizeof(cl_mem),    &dmem);
+//  res = clSetKernelArg(cost_kernel, 9, sizeof(int),       &param_buf);
 */
 
 #define pixels_			0  // Can these be #included from a common header for both host and device code?
@@ -52,25 +50,17 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float max_inv_depth = params[max_inv_depth_];  // not used
 	float min_inv_depth = params[min_inv_depth_];
 	float inv_d_step 	= params[inv_d_step_];
+	float u 			= global_id % cols;														// keyframe pixel coords
+	float v 			= (int)(global_id / cols);
+	int offset_3 		= global_id *3;															// Get keyframe pixel values
+	float3 B;		B.x = base[offset_3];	B.y = base[offset_3];	B.z = base[offset_3];		// pixel from keyframe
 
-	// keyframe pixel coords
-	float u = global_id % cols;
-	float v = (int)(global_id / cols);
+	float 	u2,	v2, rho,	inv_depth=0.0,	ns=0.0,	mini=0.0,	minv=3.0,	maxv=0.0;			// variables for the cost vol
+	int 	int_u2, int_v2, coff_00, coff_01, coff_10, coff_11, cv_idx=global_id,	layer = 0;
+	float3 	c, c_00, c_01, c_10, c_11;
+	float 	c0 = cdata[cv_idx];																	// cost for this elem of cost vol
+	float 	w  = hdata[cv_idx];																	// count of updates of this costvol element. w = 001 initially
 
-	// Get keyframe pixel values
-	int offset_3 = global_id *3;
-	float3 B;	B.x = base[offset_3]; B.y = base[offset_3]; B.z = base[offset_3];	// pixel from keyframe
-
-	// variables for the cost vol
-	float u2,v2, inv_depth=0.0;
-	int int_u2, int_v2, cv_idx = global_id;
-	int coff_00, coff_01, coff_10, coff_11;
-	float3 c, c_00, c_01, c_10, c_11;
-	float rho;
-	float ns=0.0, mini=0.0, minv=3.0, maxv=0.0; // 3.0 would be max rho for 3 chanels.
-	float c0 = cdata[cv_idx];	// cost for this elem of cost vol
-	float w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
-	int layer = 0;
 	// layer zero, ////////////////////////////////////////////////////////////////////////////////////////
 	// inf depth, roation without paralax, i.e. reproj without translation.
 	// Use depth=1 unit sphere, with rotational-preprojection matrix
@@ -80,6 +70,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float vh2 = k2k[4]*u + k2k[5]*v + k2k[6]*1;  // +k2k[7]/z
 	float wh2 = k2k[8]*u + k2k[9]*v + k2k[10]*1; // +k2k[11]/z
 	//float h/z  = k2k[12]*u + k2k[13]*v + k2k[14]*1; // +k2k[15]/z
+	float uh3, vh3, wh3;
 
 	// cost volume loop  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	#define MAX_LAYERS 64
@@ -91,11 +82,12 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 		// locate pixel to sample from  new image. Depth dependent part.
 		inv_depth = (layer * inv_d_step) + min_inv_depth;
-		uh2  = uh2 + k2k[3]*inv_depth;
-		vh2  = vh2 + k2k[7]*inv_depth;
-		wh2  = wh2 + k2k[11]*inv_depth;
-		u2   = uh2/wh2;
-		v2   = vh2/wh2;
+		uh3  = uh2 + k2k[3]*inv_depth;
+		vh3  = vh2 + k2k[7]*inv_depth;
+		wh3  = wh2 + k2k[11]*inv_depth;
+		u2   = uh3/wh3;
+		v2   = vh3/wh3;
+		if(u==70 && v==470)printf("\n(inv_depth=%f,   ",inv_depth);
 
 		int_u2 = ceil(u2);
 		int_v2 = ceil(v2);
@@ -134,14 +126,14 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	}
 
 	// Print out data at one pixel, at each layer:
-	if(u==70 && v==470){
+	if(u==70 && v==470 && layer==10){
 		// (u==407 && v==60) corner of picture,  (u==300 && v==121) centre of monitor, (u==171 && v==302) on the desk, (470, 70) out of frame in later images
 		float d;
 		if (inv_depth==0){d=0;}
 		else {d=1/inv_depth;}
 		printf("\nlayer=%i, inv_depth=%f, depth=%f, um=%f, vm=%f, rho=%f, trans=(%f,%f,%f), c0=%f, w=%f, ns=%f, rho=%f, minv=%f, mini=%f, params[%i,%i,%i,%i,%f,%f,%f,]", \
 		layer, inv_depth, d, u2, v2, rho, k2k[3], k2k[7], k2k[11], c0, w, ns, rho, minv, mini,\
-			pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step
+		pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step
 		);
 	}
 
@@ -151,7 +143,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	hi[global_id] 	= maxv; 			// max photometric cost
 
 	// refinement step - from DTAM Mapping
-
+	/*
 	if(mini == 0 || mini == layers-1) return;// first or last inverse depth was best
 	const float A_ = cdata[(int)(global_id + (mini-1)*pixels)]  ;//Cost[i+(minl-1)*layerStep];
 	const float B_ = minv;
@@ -159,8 +151,10 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float delta = ((A_+C_)==2*B_)? 0.0f : ((C_-A_)*inv_d_step)/(2*(A_-2*B_+C_));
 	delta = (fabs(delta) > inv_d_step)? 0.0f : delta;// if the gradient descent step is less than one whole inverse depth interval, reject interpolation
 	a[global_id] += delta;																		// CminIdx[i] = .. ////
-	if ((global_id%1000 ==0) &&  (delta != 0.0)) printf("(%f,%f,%f),", mini*inv_d_step, delta, inv_d_step);		// NB CminIdx used to initialize A & D
+	*/
+	//if (/*(global_id%1000 ==0) &&  (delta != 0.0)*/ (u==70 && v==470)) printf("(%f,%f,%f),", mini*inv_d_step, delta, inv_d_step);		// NB CminIdx used to initialize A & D
 	// NB at present delta is too small!
+
 }
 
 
@@ -294,7 +288,6 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	*/
 }
 
-
  __kernel void UpdateA2(  // pointwise exhaustive search
 	__global float* cdata,                         //           cost volume
 	__global float* apt,                           // dmem,     depth D
@@ -328,26 +321,24 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 float min_val		= FLT_MAX;
 	 int   min_layer	= 0;
 
-	 const float depthStep = params[inv_d_step_]; //(min_d - max_d) / (layers - 1);
-	 const int   layerStep = rows*cols;
-
-	 const float r = sqrt( 2*theta*lambda*(hi[pt] - lo[pt]) );
-	 const int start_layer = set_start_layer(d, r, max_d, depthStep, layers, x, y);  // 0;//
-	 const int end_layer   = set_end_layer  (d, r, max_d, depthStep, layers, x, y);  // layers-1; //
-	 int minl = 0;
-	 float Eaux_min = 1e+30; // set high initial value
+	 const float depthStep 	= params[inv_d_step_]; //(min_d - max_d) / (layers - 1);
+	 const int   layerStep 	= rows*cols;
+	 const float r 			= sqrt( 2*theta*lambda*(hi[pt] - lo[pt]) );
+	 const int 	start_layer = set_start_layer(d, r, max_d, depthStep, layers, x, y);  // 0;//
+	 const int 	end_layer   = set_end_layer  (d, r, max_d, depthStep, layers, x, y);  // layers-1; //
+	 int 		minl 		= 0;
+	 float 		Eaux_min 	= 1e+30; 				// set high initial value
 
 	 for(int l = start_layer; l <= end_layer; l++) {
 		const float cost_total = get_Eaux(theta, d, (float)l, min_d, depthStep, lambda, scale_Eaux, cdata[pt+l*layerStep]);
-		// apt[pt+l*layerStep] = cost_total;  // DTAM_Mapping collects an Eaux volume, for debugging.
+		// apt[pt+l*layerStep] = cost_total;  		// DTAM_Mapping collects an Eaux volume, for debugging.
 		if(cost_total < Eaux_min) {
 			Eaux_min = cost_total;
 			minl = l;
 		}
 	 }
+	float a = min_d + minl*depthStep;  				// NB implicit conversion: int minl -> float.
 
-	float a = min_d + minl*depthStep;  // NB implicit conversion: int minl -> float.
-	/*
 	//refinement step
 	if(minl > start_layer && minl < end_layer){ //return;// if(minl == 0 || minl == layers-1) // first or last was best
 		// sublayer sampling as the minimum of the parabola with the 2 points around (minl, Eaux_min)
@@ -360,7 +351,6 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 		// a[i] += delta;
 		a -= delta;
 	}
-	*/
 	apt[pt] = a;
 
 	if (x==200 && y==200) printf("\n\nUpdateA: theta=%f, lambda=%f, hi=%f, lo=%f, r=%f, d=%f, min_d=%f, max_d=%f, minl=%f, depthStep=%f, layers=%i, start_layer=%i, end_layer=%i", \

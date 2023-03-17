@@ -16,7 +16,7 @@ static vector<fs::path> depth;
 void get_all(const fs::path& root, const string& ext, vector<fs::path>& ret);
 
 void loadAhanda(const char * rootpath,
-                float range,
+                float range,// unsed
                 int imageNumber,
                 Mat& image,
                 Mat& d,

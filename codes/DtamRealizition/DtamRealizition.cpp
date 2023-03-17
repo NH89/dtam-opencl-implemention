@@ -48,14 +48,15 @@ int main()
 	cout << "\n main_chk 2\n" << flush;
 	for (int i =0; i < imagesPerCV; i += inc) {								// Load images & data from file into c++ vectors
 		Mat tmp, d, image;
-		int offset = 10;							//46;//462;//380;//0;	// better location in this dataset for translation for paralax flow.
+		int offset = 475;							//10;//46;//462;//380;//0;	// better location in this dataset for translation for paralax flow.
 																			// TODO use a control file specifying where to sample the video.
-		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
+		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj3_loop",
+					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
 				    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
 					//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
-			65535,
+			65535,	//range, unused
 			i + offset,
 			image,															// NB .png image is converted CV_8UC3 -> CV_32FC3, and given GaussianBlurr (3,3).
 			d,
@@ -89,8 +90,8 @@ int main()
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
 	int layers 					= 64;										//32;//
-	float min_inv_depth 		= 1.0/4500.0;								//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
-	float max_inv_depth 		= 1.0/1400.0;
+	float min_inv_depth 		= 1.0/450.0;	//1.0/4347.0; //							//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
+	float max_inv_depth 		= 1.0/70.0;	//1.0/3289.0; //
 	float occlusionThreshold 	= .05;
 	int startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
@@ -111,7 +112,7 @@ int main()
 	bool doneOptimizing;
 	int opt_count = 0;
 	do {
-		for (int i = 0; i < 10; i++)
+		for (int i = 0; i < 1/*10*/; i++)
 			cv.updateQD();													// Optimize Q, D   (primal-dual)
 		doneOptimizing = cv.updateA();										// Optimize A      (pointwise exhaustive search)
 		opt_count ++;
