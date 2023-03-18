@@ -44,7 +44,7 @@ public:
 	cl_command_queue	m_queue;
 	cl_program			m_program;
 	cl_kernel			cost_kernel, cache3_kernel, cache4_kernel, updateQD_kernel, updateA_kernel;
-	cl_mem				basemem, imgmem, cdatabuf, hdatabuf, k2kbuf, dmem, amem, basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem, param_buf;
+	cl_mem				basemem, imgmem, cdatabuf, hdatabuf, k2kbuf, dmem, amem, basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem, param_buf, img_sum_buf;
 
 	size_t  			global_work_size, local_work_size, image_size_bytes;
 	bool 				gpu, amdPlatform;
@@ -56,10 +56,10 @@ public:
 
 	RunCL(boost::filesystem::path out_path);
 	void createFolders(boost::filesystem::path out_path); // NB called by RunCL(..) constructor, above.
-	void saveCostVols();
+	void saveCostVols(float max_range);
 	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show, float max_range );
 	void DownloadAndSave_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder_tiff, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
-	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
+	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show, float max_range );
 
 	void allocatemem(float* gx, float* gy, float* params, int layers, cv::Mat &baseImage, float *cdata, float *hdata); 			/*float *qx, float *qy,*/
 	void calcCostVol(float* k2k, cv::Mat &image); 						/*cv::Mat &baseImage,*/ /*float thresh, int layers*/ /*, float *cdata, float *hdata*/

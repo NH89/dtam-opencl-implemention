@@ -82,7 +82,7 @@ void CostVol::checkInputs(
 }
 
 CostVol::CostVol(
-	Mat image,
+	Mat 		image,
 	FrameID 	_fid,
 	int 		_layers,
 	float 		_near,

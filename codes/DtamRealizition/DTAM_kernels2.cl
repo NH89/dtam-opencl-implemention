@@ -28,6 +28,7 @@
 #define theta_			12
 #define lambda_			13	///   __kernel void UpdateA2
 #define scale_Eaux_		14
+
 __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 // TODO rewrite with homogeneuos coords to handle points at infinity (x,y,z,0) -> (u,v,0)
 	__global float* k2k,		//0
@@ -39,7 +40,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	__global float* hi,			//6
 	__global float* a,			//7
 	__global float* d,			//8
-	__constant float* params)	//9 pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step, threshold
+	__constant float* params,	//9 pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step, threshold
+	__global float* img_sum)	//10
 {
 	int global_id = get_global_id(0);
 
@@ -111,13 +113,20 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 			c = factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // float3, bi-linear interpolation
 
 			// Compute photometric cost
-			rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/(3.0);	//					// L1 norm between keyframe & new frame pixels.
-			cost[layer] = (cost[layer]*w + rho) / (w + 1);				// cost[layer] = existing value in this costvol elem.
+			//rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/(3.0);	//					// L1 norm between keyframe & new frame pixels.
+			float rx=(c.x-B.x); float ry=(c.y-B.y); float rz=(c.z-B.z);
+
+			rho = sqrt( rx*rx + ry*ry + rz*rz );	//					// L2 norm between keyframe & new frame pixels.
+			cost[layer] += rho; //= (cost[layer]*w + rho) / (w + 1);				// cost[layer] = existing value in this costvol elem.
 			cdata[cv_idx] = cost[layer];  //rho;//c.x + c.y + c.z; // Costdata, same location cost[layer] was read from.  // CostVol set here ###########
 			hdata[cv_idx] = w + 1;		//B.x + B.y+ B.z; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
+			img_sum[cv_idx] += (c.x + c.y + c.z)/3; //= (img_sum[cv_idx]*w + ((c.x + c.y + c.z)/3)) / (w + 1);
 		}
 	}
 	for( layer=0;  layer<layers; layer++ ){
+		//cv_idx = global_id + layer*pixels;
+		//img_sum[cv_idx] /= hdata[cv_idx];
+
 		if (cost[layer] < minv) { 		// find idx & value of min cost in this ray of cost vol, given this update. NB Use array private to this thread.
 			minv = cost[layer];
 			mini = layer;

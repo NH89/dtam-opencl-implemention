@@ -16,7 +16,7 @@ int main()
 	//verbosity = 1; // -1= none, 0=errors only, 1=basic, 2=lots.
 	cout << "\n main_chk 0\n" << flush;
 	int numImg 			= 50;
-	int imagesPerCV 	= 30;
+	int imagesPerCV 	= 6; //30;
 	char filename[500];
 	Mat image, R, T;														// See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
 	Mat cameraMatrix = (Mat_<float>(3, 3) <<  481.20,   0.0,  319.5,
@@ -50,8 +50,8 @@ int main()
 		Mat tmp, d, image;
 		int offset = 475;							//10;//46;//462;//380;//0;	// better location in this dataset for translation for paralax flow.
 																			// TODO use a control file specifying where to sample the video.
-		loadAhanda("/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj3_loop",
-					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
+		loadAhanda(//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj3_loop",
+					"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
 				    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
@@ -102,8 +102,8 @@ int main()
 	for (int imageNum = 0; imageNum < imagesPerCV; imageNum+=1){			// Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
+		if (imageNum%5 == 0) cv.cvrc.saveCostVols(imageNum+1);
 	}
-	cv.cvrc.saveCostVols();
 
 	cout << "\n main_chk 5\tcacheGValues: =========================================================" << endl<<flush;
 	cv.cacheGValues();														// cacheGValues()  elementwise weighting on keframe image gradient
