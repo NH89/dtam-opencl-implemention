@@ -31,8 +31,8 @@ public:
 	//near & far : inverse depth of center of voxels in layer layers-1 //inverse depth of center of voxels in layer 0
 	float   near, far,  depthStep, initialWeight, occlusionThreshold;
 	Matx44f K, inv_K, pose, inv_pose;
-	Mat R, T, cameraMatrix, projection;												//Note! should be in OpenCV format
-	Mat baseImage, baseImageGray, costdata, hit;  									//projects world coordinates (x,y,z) into (rows,cols,layers)
+	Mat R, T, cameraMatrix, projection;												//Note! should be in OpenCV format //projects world coordinates (x,y,z) into (rows,cols,layers)
+	Mat baseImage, baseImageGray, costdata, hit, img_sum_data;
 	Mat _qx, _qy, _d, _a, _g, _g1, _gx, _gy, lo, hi;
 
 	void updateCost(const cv::Mat& image,  const cv::Mat& R,  const cv::Mat& T);	//Accepts pinned RGBA8888 or BGRA8888 for high speed

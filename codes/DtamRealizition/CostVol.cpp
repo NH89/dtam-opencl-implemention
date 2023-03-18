@@ -246,6 +246,8 @@ CostVol::CostVol(
 	costdata = initialCost;
 	hit      = Mat::zeros(layers, rows * cols, CV_32FC1);
 	hit      = initialWeight;
+	img_sum_data = Mat::zeros(layers, rows * cols, CV_32FC1);
+
 	
 	FLATALLOC(lo);		// TODO get rid of this. Get to
 	FLATALLOC(hi);		// (i)  one record of rows & cols,
@@ -262,7 +264,10 @@ CostVol::CostVol(
 	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
 	baseImageGray 	= baseImageGray.reshape(0, rows);							// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
 
-    count      = 0;
+	float *to_ptr=(float*)img_sum_data.data,  *from_ptr=(float*)baseImageGray.data;
+	for (int i=0; i<img_sum_data.total(); i++) to_ptr[i]=from_ptr[i%baseImageGray.total()];	// tile baseImageGray onto img_sum_data.
+
+	count      = 0;
 	thetaStart = 0.2;				//0.2;		//200.0*off;					// DTAM paper & DTAM_Mapping has Theta_start = 0.2
 	//thetaMin   = 9.9e-8;			//1.0e-4;	//1.0*off;						// DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
 	thetaStep  = 0.87;				//0.97;
@@ -281,7 +286,7 @@ CostVol::CostVol(
 	cvrc.params[LAMBDA]			=  lambda;		///   __kernel void UpdateA2
 	cvrc.params[SCALE_EAUX]		=  10000;		// from DTAM_Mapping input/json/icl_numin.json    //1.0;
 
-	cvrc.allocatemem( (float*)_gx.data, (float*)_gy.data, cvrc.params, layers, baseImage, (float*)costdata.data, (float*)hit.data);
+	cvrc.allocatemem( (float*)_gx.data, (float*)_gy.data, cvrc.params, layers, baseImage, (float*)costdata.data, (float*)hit.data, (float*)img_sum_data.data );
 	if(verbosity>0) cout << "CostVol_chk 6\n" << flush;
 }
 

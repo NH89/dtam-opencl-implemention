@@ -16,7 +16,7 @@ int main()
 	//verbosity = 1; // -1= none, 0=errors only, 1=basic, 2=lots.
 	cout << "\n main_chk 0\n" << flush;
 	int numImg 			= 50;
-	int imagesPerCV 	= 6; //30;
+	int imagesPerCV 	= 7; //30;
 	char filename[500];
 	Mat image, R, T;														// See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
 	Mat cameraMatrix = (Mat_<float>(3, 3) <<  481.20,   0.0,  319.5,
@@ -89,20 +89,20 @@ int main()
 	cout << "\n main_chk 3\n" << flush; 									//Setup camera matrix
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
-	int layers 					= 64;										//32;//
+	int   layers 				= 64;										//32;//
 	float min_inv_depth 		= 1.0/450.0;	//1.0/4347.0; //							//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
 	float max_inv_depth 		= 1.0/70.0;	//1.0/3289.0; //
 	float occlusionThreshold 	= .05;
-	int startAt 				= 0;
+	int   startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
 																			// Instantiate CostVol ///////////
-	CostVol cv(images[startAt], (FrameID)startAt, layers, max_inv_depth, min_inv_depth, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path);
+	CostVol cv(images[startAt], (FrameID)startAt, layers, max_inv_depth, min_inv_depth, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path /* float initialCost=1.0, float initialWeight=0.001*/ );
 
 	cout << "\n main_chk 4\tcalculate cost volume: ================================================" << endl << flush;
-	for (int imageNum = 0; imageNum < imagesPerCV; imageNum+=1){			// Update CostVol ////////////////
+	for (int imageNum = 1; imageNum < imagesPerCV; imageNum+=1){			// Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
-		if (imageNum%5 == 0) cv.cvrc.saveCostVols(imageNum+1);
+		if (imageNum%5 == 1) cv.cvrc.saveCostVols(imageNum+1);
 	}
 
 	cout << "\n main_chk 5\tcacheGValues: =========================================================" << endl<<flush;
