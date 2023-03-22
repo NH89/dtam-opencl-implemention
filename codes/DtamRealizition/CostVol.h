@@ -23,7 +23,7 @@ public:
 		 float occlusionThreshold,
 		 boost::filesystem::path out_path,
 		 float initialCost   = 1.0,//3.0,
-		 float initialWeight = .001
+		 float initialWeight = .0000001
 		 );
 	RunCL   cvrc;
 	FrameID fid;

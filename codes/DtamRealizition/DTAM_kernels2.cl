@@ -75,67 +75,41 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	float uh3, vh3, wh3;
 
 	// cost volume loop  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	#define MAX_LAYERS 64
+	#define MAX_LAYERS 256 //64
 	float cost[MAX_LAYERS];
 	for( layer=0;  layer<layers; layer++ ){
 		cv_idx = global_id + layer*pixels;
-		/*c0*/ cost[layer] = cdata[cv_idx];	// cost for this elem of cost vol
-		w  = hdata[cv_idx];	// count of updates of this costvol element. w = 001 initially
-
-		// locate pixel to sample from  new image. Depth dependent part.
-		inv_depth = (layer * inv_d_step) + min_inv_depth;
+		cost[layer] = cdata[cv_idx];													// cost for this elem of cost vol
+		w  = hdata[cv_idx];																// count of updates of this costvol element. w = 001 initially
+		inv_depth = (layer * inv_d_step) + min_inv_depth;								// locate pixel to sample from  new image. Depth dependent part.
 		uh3  = uh2 + k2k[3]*inv_depth;
 		vh3  = vh2 + k2k[7]*inv_depth;
 		wh3  = wh2 + k2k[11]*inv_depth;
 		u2   = uh3/wh3;
 		v2   = vh3/wh3;
 		if(u==70 && v==470)printf("\n(inv_depth=%f,   ",inv_depth);
+		int_u2 = ceil(u2-0.5);		// nearest neighbour interpolation
+		int_v2 = ceil(v2-0.5);
 
-		int_u2 = ceil(u2);
-		int_v2 = ceil(v2);
-
-		if ( !((int_u2<1) || (int_u2>cols-2) || (int_v2<1) || (int_v2>rows-2)) ) {  	// if (not within new frame) skip
-			// compute adjacent pixel indices
-			coff_11 =  int_v2    * cols +  int_u2;
-			coff_10 = (int_v2-1) * cols +  int_u2;
-			coff_01 =  int_v2    * cols + (int_u2 -1);
-			coff_00 = (int_v2-1) * cols + (int_u2 -1);
-
-			// sample adjacent pixels
-			c_11.x= img[coff_11*3]; c_11.y=img[1+(coff_11*3)], c_11.z=img[2+(coff_11*3)];		// c.xyz = rgb values of pixel in new frame
-			c_10.x= img[coff_10*3]; c_10.y=img[1+(coff_10*3)], c_10.z=img[2+(coff_10*3)];
-			c_01.x= img[coff_01*3]; c_01.y=img[1+(coff_01*3)], c_01.z=img[2+(coff_01*3)];
-			c_00.x= img[coff_00*3]; c_00.y=img[1+(coff_00*3)], c_00.z=img[2+(coff_00*3)];
-
-			// weighting for bi-linear interpolation
-			float factor_x = fmod(u2,1);
-			float factor_y = fmod(v2,1);
-			c = factor_y * (c_11*factor_x  + c_01*(1-factor_x)) + (1-factor_y) * (c_10*factor_x  + c_00*(1-factor_x));  // float3, bi-linear interpolation
-
-			// Compute photometric cost
-			//rho = ( fabs(c.x-B.x) + fabs(c.y-B.y) + fabs(c.z-B.z) )/(3.0);	//					// L1 norm between keyframe & new frame pixels.
-			float rx=(c.x-B.x); float ry=(c.y-B.y); float rz=(c.z-B.z);
-
-			rho = sqrt( rx*rx + ry*ry + rz*rz );	//					// L2 norm between keyframe & new frame pixels.
-			cost[layer] += rho; //= (cost[layer]*w + rho) / (w + 1);				// cost[layer] = existing value in this costvol elem.
-			cdata[cv_idx] = cost[layer];  //rho;//c.x + c.y + c.z; // Costdata, same location cost[layer] was read from.  // CostVol set here ###########
-			hdata[cv_idx] = w + 1;		//B.x + B.y+ B.z; //c.x + c.y + c.z; //rho; //			// Weightdata, counts updates of this costvol element.
-			img_sum[cv_idx] += (c.x + c.y + c.z)/3; //= (img_sum[cv_idx]*w + ((c.x + c.y + c.z)/3)) / (w + 1);
+		if ( !((int_u2<0) || (int_u2>cols-1) || (int_v2<0) || (int_v2>rows-1)) ) {  	// if (not within new frame) skip
+			c=img[(int_v2*cols + int_u2)*3];											// nearest neighbour interpolation
+			float rx=(c.x-B.x); float ry=(c.y-B.y); float rz=(c.z-B.z);					// Compute photometric cost // L2 norm between keyframe & new frame pixels.
+			rho = sqrt( rx*rx + ry*ry + rz*rz )*50;										//TODO make *50 an auto-adjusted parameter wrt cotrast in area of interest.
+			cost[layer] = (cost[layer]*w + rho) / (w + 1);
+			cdata[cv_idx] = cost[layer];  												// CostVol set here ###########
+			hdata[cv_idx] = w + 1;														// Weightdata, counts updates of this costvol element.
+			img_sum[cv_idx] += (c.x + c.y + c.z)/3;
 		}
 	}
 	for( layer=0;  layer<layers; layer++ ){
-		//cv_idx = global_id + layer*pixels;
-		//img_sum[cv_idx] /= hdata[cv_idx];
-
-		if (cost[layer] < minv) { 		// find idx & value of min cost in this ray of cost vol, given this update. NB Use array private to this thread.
-			minv = cost[layer];
+		if (cost[layer] < minv) { 														// Find idx & value of min cost in this ray of cost vol, given this update.
+			minv = cost[layer];															// NB Use array private to this thread.
 			mini = layer;
 		}
 		maxv = fmax(cost[layer], maxv);
 	}
-
-	// Print out data at one pixel, at each layer:
-	if(u==70 && v==470 && layer==10){
+	/*
+	if(u==70 && v==470 && layer==10){													// Print out data at one pixel, at each layer:
 		// (u==407 && v==60) corner of picture,  (u==300 && v==121) centre of monitor, (u==171 && v==302) on the desk, (470, 70) out of frame in later images
 		float d;
 		if (inv_depth==0){d=0;}
@@ -145,27 +119,23 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step
 		);
 	}
-
-	lo[global_id] 	= minv; 			// min photometric cost  // rho;//
-	a[global_id] 	= mini*inv_d_step + min_inv_depth;// c.x + c.y + c.z; //mini*inv_d_step; 	// inverse distance      //  int_u2;//
-	d[global_id] 	= mini*inv_d_step + min_inv_depth;//ns;   	// photometric cost in the last layer of cost vol. // not a good initiallization of d[] ?   // int_v2;//
-	hi[global_id] 	= maxv; 			// max photometric cost
-
-	// refinement step - from DTAM Mapping
-	/*
-	if(mini == 0 || mini == layers-1) return;// first or last inverse depth was best
-	const float A_ = cdata[(int)(global_id + (mini-1)*pixels)]  ;//Cost[i+(minl-1)*layerStep];
-	const float B_ = minv;
-	const float C_ = cdata[(int)(global_id + (mini+1)*pixels)]  ;//Cost[i+(minl+1)*layerStep];
-	float delta = ((A_+C_)==2*B_)? 0.0f : ((C_-A_)*inv_d_step)/(2*(A_-2*B_+C_));
-	delta = (fabs(delta) > inv_d_step)? 0.0f : delta;// if the gradient descent step is less than one whole inverse depth interval, reject interpolation
-	a[global_id] += delta;																		// CminIdx[i] = .. ////
 	*/
-	//if (/*(global_id%1000 ==0) &&  (delta != 0.0)*/ (u==70 && v==470)) printf("(%f,%f,%f),", mini*inv_d_step, delta, inv_d_step);		// NB CminIdx used to initialize A & D
-	// NB at present delta is too small!
+	lo[global_id] 	= minv; 															// min photometric cost  // rho;//
+	a[global_id] 	= mini*inv_d_step + min_inv_depth;									// inverse distance
+	d[global_id] 	= mini*inv_d_step + min_inv_depth;
+	hi[global_id] 	= maxv; 															// max photometric cost
 
+	// refinement step - from DTAM Mapping // ?? TODO should this be here ?? No evident advantage.
+	/*
+	if(mini == 0 || mini == layers-1) return;											// first or last inverse depth was best
+	const float A_ = cdata[(int)(global_id + (mini-1)*pixels)]  ;						//Cost[i+(minl-1)*layerStep];
+	const float B_ = minv;
+	const float C_ = cdata[(int)(global_id + (mini+1)*pixels)]  ;						//Cost[i+(minl+1)*layerStep];
+	float delta = ((A_+C_)==2*B_)? 0.0f : ((C_-A_)*inv_d_step)/(2*(A_-2*B_+C_));
+	delta = (fabs(delta) > inv_d_step)? 0.0f : delta;				// if the gradient descent step is less than one whole inverse depth interval, reject interpolation
+	a[global_id] += delta;																// CminIdx[i] = .. ////
+	*/
 }
-
 
  __kernel void CacheG3(
 	 __global float* base,
@@ -211,18 +181,19 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 if (x==100 && y==100) printf("\n\nCacheG4, params[alpha_g_]=%f, params[beta_g_]=%f, gxp[offset]=%f, gyp[offset]=%f, g1p[offset]=%f, sqrt(gx*gx + gy*gy)=%f, pow(sqrt(gx*gx + gy*gy), betaG)=%f \n", params[alpha_g_], params[beta_g_], gxp[offset], gyp[offset], g1p[offset], sqrt(gx*gx + gy*gy), pow(sqrt(gx*gx + gy*gy), betaG) );
  }
 
-
  __kernel void UpdateQD(
 	 __global float* g1pt,
 	 __global float* qpt,
 	 __global float* dpt,                           	// dmem,     depth D
 	 __global float* apt,                           	// amem,     auxilliary A
+	 //__global float* hdata,
 	 __constant float* params
 	 )
  {
 	 int g_id = get_global_id(0);
 	 int rows 			= floor(params[rows_]);
 	 int cols 			= floor(params[cols_]);
+	 int layers			= floor(params[layers_]);
 	 float epsilon 		= params[epsilon_];
 	 float sigma_q 		= params[sigma_q_];
 	 float sigma_d 		= params[sigma_d_];
@@ -231,6 +202,8 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 int y = g_id / cols;
 	 int x = g_id % cols;
 	 unsigned int pt = x + y * cols;					// index of this pixel
+	 if (pt >= (cols*rows))return;
+	 //if (hdata[pt+ (layers-1)*rows*cols] <=0.0) return;		// if no input image overlaps, on layer 0 of hitbuffer, skip this pixel. // makes no difference
 	 barrier(CLK_GLOBAL_MEM_FENCE);
 	 const int wh = (cols*rows);
 
@@ -271,7 +244,6 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		 dpt[pt], d, sigma_q, epsilon, g1, div_q , a, theta, sigma_d, qx, qy, maxq, dd_x, dd_y );
  }
 
-
 int set_start_layer(float di, float r, float far, float depthStep, int layers, int x, int y){ //( inverse_depth, r , min_inv_depth, inv_depth_step, num_layers )
     const float d_start = di - r;
     const int start_layer =  floor( (d_start - far)/depthStep );
@@ -303,6 +275,7 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	__global float* dpt,                           // amem,     auxilliary A
 	__global float* lo,
 	__global float* hi,
+	//__global float* hdata,
 	__constant float* params
 )
  {
@@ -321,6 +294,7 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	 x = x % cols;
 	 unsigned int pt  = x + y * cols;               // index of this pixel
 	 if (pt >= (cols*rows))return;
+	 //if (hdata[pt+ (layers-1)*rows*cols] <=0.0) return;	// if no input image overlaps, on layer 0 of hitbuffer, skip this pixel.// makes no difference
 	 unsigned int cpt = pt;
 
 	 barrier(CLK_GLOBAL_MEM_FENCE);

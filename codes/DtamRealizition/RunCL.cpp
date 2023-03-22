@@ -134,12 +134,15 @@ void RunCL::DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem:
 		if (temp_mat.channels()==1) { cv::minMaxLoc(temp_mat, &minVal, &maxVal, &minLoc, &maxLoc); }
 		string type_string = checkCVtype(type_mat);
 		stringstream ss;
+		stringstream png_ss;
 		ss << "/" << folder_tiff.filename().string() << "_" << count <<"_sum"<<sum<<"type_"<<type_string<<"min"<<minVal<<"max"<<maxVal<<"maxRange"<<max_range;
+		png_ss << "/" << folder_tiff.filename().string() << "_" << count;
 		boost::filesystem::path folder_png = folder_tiff;
 		folder_tiff += ss.str();
 		folder_tiff += ".tiff";
 		folder_png  += "/png/";
-		folder_png  += ss.str();
+
+		folder_png  += png_ss.str();
 		folder_png  += ".png";
 		cout<<"\n\nDownloadAndSave filename = ["<<ss.str()<<"]";
 		cv::Mat outMat;
@@ -176,18 +179,22 @@ void RunCL::DownloadAndSave_3Channel(cl_mem buffer, std::string count, boost::fi
 			if (maxVal[i] > max) max = maxVal[i];
 		}
 		stringstream ss;
+		stringstream png_ss;
 		ss<<"/"<<folder_tiff.filename().string()<<"_"<<count<<"_sum"<<sum<<"type_"<<type_string<<"min("<<minVal[0]<<","<<minVal[1]<<","<<minVal[2]<<")_max("<<maxVal[0]<<","<<maxVal[1]<<","<<maxVal[2]<<")";
+		png_ss<< "/" << folder_tiff.filename().string() << "_" << count;
 		if(show){
 			cv::Mat temp;
 			temp_mat.convertTo(temp, CV_8U);									// NB need CV_U8 for imshow(..)
 			cv::imshow( ss.str(), temp);
 		}
 		boost::filesystem::path folder_png = folder_tiff;
+		folder_png  += "/png/";
+		folder_png  += png_ss.str();
+		folder_png  += ".png";
+
 		folder_tiff += ss.str();
 		folder_tiff += ".tiff";
-		folder_png  += "/png/";
-		folder_png  += ss.str();
-		folder_png  += ".png";
+
 
 		cv::Mat outMat;
 		if (type_mat == CV_32FC3){
@@ -218,7 +225,9 @@ void RunCL::DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::files
 
 		string type_string = checkCVtype(type_mat);
 		stringstream ss;
+		stringstream png_ss;
 		ss << "/"<< folder.filename().string() << "_" << count << "_layer"<< i <<"_sum"<<sum<<"type_"<<type_string<< "min"<<minVal<<"max"<<maxVal;
+		png_ss << "/"<< folder.filename().string() << "_" << count << "_layer"<< i;
 		if(show){
 			cv::Mat temp;
 			temp_mat.convertTo(temp, CV_8U);									// NB need CV_U8 for imshow(..)
@@ -227,7 +236,7 @@ void RunCL::DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::files
 		new_filepath += ss.str();
 		new_filepath += ".tiff";
 		folder_png += "/png/";
-		folder_png += ss.str();
+		folder_png += png_ss.str();
 		folder_png += ".png";
 
 		cout << "\nnew_filepath.string() = "<<new_filepath.string() <<"\n";
@@ -514,6 +523,7 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 	res = clSetKernelArg(updateQD_kernel, 1, sizeof(cl_mem), &qmem);	 if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res) <<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateQD_kernel, 2, sizeof(cl_mem), &dmem);	 if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res) <<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateQD_kernel, 3, sizeof(cl_mem), &amem);	 if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res) <<"\n"<<flush;exit_(res);}
+	//res = clSetKernelArg(updateQD_kernel, 4, sizeof(cl_mem), &hdatabuf); if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res) <<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateQD_kernel, 4, sizeof(cl_mem), &param_buf);if(res!=CL_SUCCESS){cout<<"\nparam_buf res = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 
 	res = clEnqueueNDRangeKernel(m_queue, updateQD_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); 										// run updateQD_kernel  aka UpdateQD(..) ####
@@ -558,6 +568,7 @@ void RunCL::updateA(int layers, float lambda, float theta)
 	res = clSetKernelArg(updateA_kernel, 2, sizeof(cl_mem), &dmem);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateA_kernel, 3, sizeof(cl_mem), &lomem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateA_kernel, 4, sizeof(cl_mem), &himem);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	//res = clSetKernelArg(updateA_kernel, 5, sizeof(cl_mem), &hdatabuf); if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res) <<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(updateA_kernel, 5, sizeof(cl_mem), &param_buf);if(res!=CL_SUCCESS){cout<<"\nparam_buf res = "<<checkerror(res)<<"\n"<<flush;exit_(res);} // param_buf
 
 	status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " << checkerror(status) <<"\n"<<flush; exit_(status);}

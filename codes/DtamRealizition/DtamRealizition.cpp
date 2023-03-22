@@ -16,7 +16,7 @@ int main()
 	//verbosity = 1; // -1= none, 0=errors only, 1=basic, 2=lots.
 	cout << "\n main_chk 0\n" << flush;
 	int numImg 			= 50;
-	int imagesPerCV 	= 7; //30;
+	int imagesPerCV 	= 30;//7; //30;
 	char filename[500];
 	Mat image, R, T;														// See "scene_00_*.txt flies and "getcamK_octave.m" in ICL dataset.
 	Mat cameraMatrix = (Mat_<float>(3, 3) <<  481.20,   0.0,  319.5,
@@ -48,9 +48,10 @@ int main()
 	cout << "\n main_chk 2\n" << flush;
 	for (int i =0; i < imagesPerCV; i += inc) {								// Load images & data from file into c++ vectors
 		Mat tmp, d, image;
-		int offset = 475;							//10;//46;//462;//380;//0;	// better location in this dataset for translation for paralax flow.
+		int offset = 0;//475;							//10;//46;//462;//380;//0;	// better location in this dataset for translation for paralax flow.
 																			// TODO use a control file specifying where to sample the video.
 		loadAhanda(//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj3_loop",
+				   //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/20fps/20fps_GT_archieve (1)", // does not work
 					"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
 				    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
@@ -89,7 +90,7 @@ int main()
 	cout << "\n main_chk 3\n" << flush; 									//Setup camera matrix
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
-	int   layers 				= 64;										//32;//
+	int   layers 				= 256; //64;										//32;//
 	float min_inv_depth 		= 1.0/450.0;	//1.0/4347.0; //							//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
 	float max_inv_depth 		= 1.0/70.0;	//1.0/3289.0; //
 	float occlusionThreshold 	= .05;
@@ -112,7 +113,7 @@ int main()
 	bool doneOptimizing;
 	int opt_count = 0;
 	do {
-		for (int i = 0; i < 1/*10*/; i++)
+		for (int i = 0; i < 10; i++)
 			cv.updateQD();													// Optimize Q, D   (primal-dual)
 		doneOptimizing = cv.updateA();										// Optimize A      (pointwise exhaustive search)
 		opt_count ++;
