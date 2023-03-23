@@ -538,7 +538,7 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 		int this_count = count + QDcount;
 		ss << this_count;
 		cv::Size q_size( baseImage_size.width, 2* baseImage_size.height ); // 2x sized for qx and qy.
-		DownloadAndSave(qmem,   ss.str(), paths.at("qmem"),    2*width * height * sizeof(float), q_size        , CV_32FC1, false , -1*params[MAX_INV_DEPTH]);
+		(qmem,   ss.str(), paths.at("qmem"),    2*width * height * sizeof(float), q_size        , CV_32FC1, false , -1*params[MAX_INV_DEPTH]);
 		DownloadAndSave(dmem,   ss.str(), paths.at("dmem"),    width * height * sizeof(float)  , baseImage_size, CV_32FC1, false , params[MAX_INV_DEPTH]);
 		clFlush(m_queue);
 		clFinish(m_queue);

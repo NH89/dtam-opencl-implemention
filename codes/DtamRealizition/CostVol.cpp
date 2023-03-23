@@ -1,6 +1,7 @@
 //#include "stdafx.h"     // windows precompiled header file
 #include "CostVol.h"
 //#include <opencv2/core/operations.hpp>
+#include <opencv2/viz.hpp>
 #include <fstream>
 #include <iomanip>   // std::setprecision, std::setw
 
@@ -176,7 +177,7 @@ CostVol::CostVol(
 	inv_K.operator()(0,2)  = (cy*skew - cx*fy)/(fx*fy);
 	inv_K.operator()(1,2)  = -cy/fy;
 
-	if(verbosity>1) {
+	if(verbosity>-1) {
 		cv::Matx44f test_K = inv_K * K;
 		cout<<"\n\ntest_camera_intrinsic_matrix inversion\n";	// Verify inv_K:
 		for(int i=0; i<4; i++){
@@ -441,10 +442,60 @@ bool CostVol::updateA()
 	return false;
 }
 
+void CostVol::writePointCloud(cv::Mat depthMap)
+{
+	cv::Mat tempImage = 255 * baseImage.reshape(0, rows*cols);
+
+	cv::Mat pointCloud(depthMap.size(), CV_32FC3);
+	cout <<"\na)pointCloud.size = " << pointCloud.size() << "\n"<<flush;
+
+	for (int u=0; u<rows ; u++){
+		for (int v=0; v<cols ; v++){
+			cv::Vec4f homogeneousPoint = inv_K * cv::Vec4f( u, v, 255*depthMap.at<float>(u,v), 1 );
+			pointCloud.at<Vec3f>(u,v) = cv::Vec3f(homogeneousPoint[0], homogeneousPoint[1], homogeneousPoint[2]) /homogeneousPoint[3];
+		}
+	}
+	cv::imshow("pointCloud depthmap", pointCloud );
+	pointCloud = pointCloud.reshape(0, rows*cols);
+
+	cout << "\nb)pointCloud.size() = " << pointCloud.size() << "\tinv_K.size() = ‘class cv::Matx<float, 4, 4>’\n"<<flush;
+
+	boost::filesystem::path folder_results  =  cvrc.paths.at("amem");
+	stringstream ss;
+	ss << folder_results.parent_path().string() << "/depthmap.pts"  ;
+	cout << "\nDepthmap file : " << ss.str() << "\n" << flush;
+	char buf[256];
+    sprintf ( buf, "%s", ss.str().data() ); // /depthmap.xyz   folder_results.parent_path().string()
+	cout << "buf"<< buf << "\n" << flush;
+	FILE* fp = fopen ( buf, "w" );
+	if (fp == NULL) {
+        std::cout << "\nvoid CostVol::writePointCloud(cv::Mat depthMap)  Could not open file "<< fp <<"\n"<< std::flush;
+        assert(0);
+    }
+    fprintf(fp, "%u\n", rows*cols);
+	for (int i=0; i<rows*cols; i++){		// (x,y,z) coordinates,  "intensity"{0-255},  "color" (rgb){0-255}.
+		fprintf(fp, "%f %f %f %i %i %i %i\n", pointCloud.at<Vec3f>(i)[0], pointCloud.at<Vec3f>(i)[1], pointCloud.at<Vec3f>(i)[2], 100, (int)(0.5+tempImage.at<Vec3f>(i)[2]), (int)(0.5+tempImage.at<Vec3f>(i)[1]), (int)(0.5+tempImage.at<Vec3f>(i)[1]) );
+	}
+	fclose ( fp );
+    fflush ( fp );
+	/*
+	 * cv::viz::writeCloud(..)	does not work, may need recompiling or may be broken/abandoned code.
+	cv::viz::writeCloud	(																// write pointCloud to file
+		ss.str(),								//const String & 	file,
+		pointCloud, 							//InputArray 	cloud,
+		baseImage.reshape(0, rows*cols),		//InputArray 	colors = noArray(),
+		noArray(),								//InputArray 	normals = noArray(),
+		false									//bool 	binary = false
+			 );
+	*/
+	cout << "\nwritePointCloud(..) finished\n" << flush;
+}
+
 void CostVol::GetResult()
 {
 	if(verbosity>1) cout<<"\nCostVol::GetResult"<<flush;
 	cvrc.ReadOutput(_a.data);
+	writePointCloud(_a);
 	cvrc.CleanUp();
 	if(verbosity>1) cout<<"\nCostVol::GetResult_finished"<<flush;
 }

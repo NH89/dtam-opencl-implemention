@@ -32,7 +32,7 @@
 #define LAMBDA			13	//   __kernel void UpdateA2
 #define SCALE_EAUX		14
 
-#define verbosity		1	// -1= none, 0=errors only, 1=basic, 2=lots.
+#define verbosity		0	// -1= none, 0=errors only, 1=basic, 2=lots.
 
 using namespace std;
 class RunCL

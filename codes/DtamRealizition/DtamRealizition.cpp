@@ -103,7 +103,7 @@ int main()
 	for (int imageNum = 1; imageNum < imagesPerCV; imageNum+=1){			// Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
-		if (imageNum%5 == 1) cv.cvrc.saveCostVols(imageNum+1);
+		//if (imageNum%5 == 1) cv.cvrc.saveCostVols(imageNum+1);
 	}
 
 	cout << "\n main_chk 5\tcacheGValues: =========================================================" << endl<<flush;
@@ -121,17 +121,11 @@ int main()
 
 	cout << "\n main_chk 7\n" << flush;
 	cv::Mat depthMap;
-	//float min = 0, max = 0;
-	cv::Mat depthImg;
-
-	cout << "\n main_chk 8\n" << flush;
 	cv.GetResult();															// GetResult /////////////////////
-    depthMap = cv._a;
-
-	double minVal=1, maxVal=1;
+    depthMap 		= cv._a;
+	double minVal	=1, 	maxVal=1;
 	cv::Point minLoc={0,0}, maxLoc{0,0};
 	cv::minMaxLoc(depthMap, &minVal, &maxVal, &minLoc, &maxLoc);
-
 	std::stringstream ss;
 	ss << "Depthmap, maxVal: " << maxVal << " minVal: " << minVal << " minLoc: "<< minLoc <<" maxLoc: " << maxLoc;
 	cv::imshow(ss.str(), (depthMap*(1.0/maxVal)));

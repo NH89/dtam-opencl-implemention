@@ -43,6 +43,7 @@ public:
 	bool updateA();
 	void GetResult();
 	void computeSigmas(float epsilon, float theta);
+	void writePointCloud(cv::Mat depthMap);
 
 private:
 	cv::Mat cBuffer;	//Must be pagable
