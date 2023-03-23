@@ -103,7 +103,7 @@ int main()
 	for (int imageNum = 1; imageNum < imagesPerCV; imageNum+=1){			// Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);
 		cout<<"\ncv.updateCost: images["<<imageNum<<"].size="<<images[imageNum].size<<"\n";
-		//if (imageNum%5 == 1) cv.cvrc.saveCostVols(imageNum+1);
+		if (imageNum%5 == 1) cv.cvrc.saveCostVols(imageNum+1);
 	}
 
 	cout << "\n main_chk 5\tcacheGValues: =========================================================" << endl<<flush;

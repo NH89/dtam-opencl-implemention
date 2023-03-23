@@ -171,7 +171,7 @@ CostVol::CostVol(
 	inv_K.operator()(0,0)  = 1.0/fx;  cout<<"\n1.0/fx="<<1.0/fx;
 	inv_K.operator()(1,1)  = 1.0/fy;  cout<<"\n1.0/fy="<<1.0/fy;
 	inv_K.operator()(2,2)  = 1.0;
-	inv_K.operator()(3,3)  = 1.0;// 1.0/(fx*fy);
+	inv_K.operator()(3,3)  = 1.0;// 1.0/(fx*fy);				// changed from (3,3) to correct from orthographic to perspective... TODO chk this works!
 
 	inv_K.operator()(0,1)  = -skew/(fx*fy);
 	inv_K.operator()(0,2)  = (cy*skew - cx*fy)/(fx*fy);
@@ -186,7 +186,7 @@ CostVol::CostVol(
 			}cout<<"\n";
 		}cout<<"\n";
 
-		std::cout << std::fixed << std::setprecision(-1);		//  Inspect values in matricies ///////
+		std::cout << std::fixed << std::setprecision(-1);		// Inspect values in matricies ///////
 		cout<<"\n\npose\n";
 		for(int i=0; i<4; i++){
 			for(int j=0; j<4; j++){
@@ -215,7 +215,7 @@ CostVol::CostVol(
 			}cout<<"\n";
 		}cout<<"\n";
 	}
-															//For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
+																// For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
 	CV_Assert(image.rows % 32 == 0 && image.cols % 32 == 0 && image.cols >= 64);
 
 	if(verbosity>0) cout << "CostVol_chk 1\n" << flush;
@@ -451,7 +451,7 @@ void CostVol::writePointCloud(cv::Mat depthMap)
 
 	for (int u=0; u<rows ; u++){
 		for (int v=0; v<cols ; v++){
-			cv::Vec4f homogeneousPoint = inv_K * cv::Vec4f( u, v, 255*depthMap.at<float>(u,v), 1 );
+			cv::Vec4f homogeneousPoint = inv_K * cv::Vec4f( u, v, 1, depthMap.at<float>(u,v) );
 			pointCloud.at<Vec3f>(u,v) = cv::Vec3f(homogeneousPoint[0], homogeneousPoint[1], homogeneousPoint[2]) /homogeneousPoint[3];
 		}
 	}
