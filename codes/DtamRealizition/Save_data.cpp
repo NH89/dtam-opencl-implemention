@@ -1,3 +1,6 @@
+//  NB this is a file of notes, with code fragments from LSD-SLAM and Morphogenesis
+
+
 
 
 // from openCV Viz module
