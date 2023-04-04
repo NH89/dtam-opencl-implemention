@@ -7,3 +7,5 @@ codes/build_AMD/*
 dtam-opencl-implemention.kdev4
 output/*
 codes/DtamRealizition/.*
+codes/output/*
+transfered_from_WS/*

@@ -17,7 +17,7 @@ RunCL::RunCL(boost::filesystem::path out_path) 										// constructor
 	if (numPlatforms > 0){															/*Choose the platform.*/
 		cl_platform_id* 	platforms = (cl_platform_id*)malloc(numPlatforms * sizeof(cl_platform_id));
 		status 	= clGetPlatformIDs(numPlatforms, platforms, NULL);					if (status != CL_SUCCESS){ cout << "Error: Getting platformsIDs" << endl; exit_(status); }
-		int n=1;				 													// rx6400=0 or gtx3080=1 ########## Choose GPU here #### NB Avoid sharing GPU with GUI #################
+		int n=0;				 													// rx6400=0 or gtx3080=1 ########## Choose GPU here #### NB Avoid sharing GPU with GUI #################
 		platform = platforms[n]; 													//0 or 1 , Need to choose platform and GPU ########## Choose platform ########### TODO replace with launch yaml file.
 		free(platforms);
 		cout << "\nplatforms[0] = "<<platforms[0]<<", \nplatforms[1] = "<<platforms[1]<<"\nSelected platform number :"<<n<<", cl_platform_id platform = " << platform<<"\n"<<flush;

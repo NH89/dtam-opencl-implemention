@@ -1,6 +1,6 @@
 #ifndef FILE_LOADER
 #define FILE_LOADER
-#include "/usr/local/include/opencv4/opencv2/opencv.hpp"//"opencv\cv.h"
+#include "/usr/include/opencv4/opencv2/opencv.hpp"//"opencv\cv.h"
 // loads all files of a given name and extension
 #include "convertAhandaPovRayToStandard.h"
 void loadAhanda(const char * rootpath,

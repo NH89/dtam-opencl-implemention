@@ -478,16 +478,6 @@ void CostVol::writePointCloud(cv::Mat depthMap)
 	}
 	fclose ( fp );
     fflush ( fp );
-	/*
-	 * cv::viz::writeCloud(..)	does not work, may need recompiling or may be broken/abandoned code.
-	cv::viz::writeCloud	(																// write pointCloud to file
-		ss.str(),								//const String & 	file,
-		pointCloud, 							//InputArray 	cloud,
-		baseImage.reshape(0, rows*cols),		//InputArray 	colors = noArray(),
-		noArray(),								//InputArray 	normals = noArray(),
-		false									//bool 	binary = false
-			 );
-	*/
 	cout << "\nwritePointCloud(..) finished\n" << flush;
 }
 
