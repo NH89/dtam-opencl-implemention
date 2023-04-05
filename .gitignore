@@ -9,3 +9,4 @@ output/*
 codes/DtamRealizition/.*
 codes/output/*
 transfered_from_WS/*
+build/*
