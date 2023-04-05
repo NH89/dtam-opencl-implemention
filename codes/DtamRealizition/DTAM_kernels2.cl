@@ -87,7 +87,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		wh3  = wh2 + k2k[11]*inv_depth;
 		u2   = uh3/wh3;
 		v2   = vh3/wh3;
-		if(u==70 && v==470)printf("\n(inv_depth=%f,   ",inv_depth);
+		//if(u==70 && v==470)printf("\n(inv_depth=%f,   ",inv_depth);
 		int_u2 = ceil(u2-0.5);		// nearest neighbour interpolation
 		int_v2 = ceil(v2-0.5);
 
@@ -154,18 +154,18 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 int y = x / cols;
 	 x = x % cols;
 	 if (x<2 || x > cols-2 || y<2 || y>rows-2) return;  // needed for wider kernel
+	 
 	 int upoff = -(y != 0)*cols;                   // up, down, left, right offsets, by boolean logic.
 	 int dnoff = (y < rows-1) * cols;
      int lfoff = -(x != 0);
 	 int rtoff = (x < cols-1);
 
-	 barrier(CLK_GLOBAL_MEM_FENCE);
-
+	 //barrier(CLK_GLOBAL_MEM_FENCE);// causes the kernel to crash on Intel Iris Xe GPU.
 	 unsigned int offset = x + y * cols;
 
 	 float pu, pd, pl, pr;                         // rho, photometric difference: up, down, left, right, of grayscale ref image.
 	 float g0x, g0y, g0, g1;
-
+	 
 	 pr =  base[offset + rtoff];// + base[offset + rtoff +1];					   // NB base = grayscale CV_8UC1 image.
 	 pl =  base[offset + lfoff];// + base[offset + lfoff -1];
 	 pu =  base[offset + upoff];// + base[offset + 2*upoff];
@@ -174,11 +174,12 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	 float gx, gy;
 	 gx			= fabs(pr - pl);
 	 gy			= fabs(pd - pu);
+	 
 	 g1p[offset]= exp(-alphaG * pow(sqrt(gx*gx + gy*gy), betaG) );
-	 gxp[offset]= gx;
-	 gyp[offset]= gy;
+	 //gxp[offset]= gx; // debugging only.
+	 //gyp[offset]= gy;
 
-	 if (x==100 && y==100) printf("\n\nCacheG4, params[alpha_g_]=%f, params[beta_g_]=%f, gxp[offset]=%f, gyp[offset]=%f, g1p[offset]=%f, sqrt(gx*gx + gy*gy)=%f, pow(sqrt(gx*gx + gy*gy), betaG)=%f \n", params[alpha_g_], params[beta_g_], gxp[offset], gyp[offset], g1p[offset], sqrt(gx*gx + gy*gy), pow(sqrt(gx*gx + gy*gy), betaG) );
+	 //if (x==100 && y==100) printf("\n\nCacheG4, params[alpha_g_]=%f, params[beta_g_]=%f, gxp[offset]=%f, gyp[offset]=%f, g1p[offset]=%f, sqrt(gx*gx + gy*gy)=%f, pow(sqrt(gx*gx + gy*gy), betaG)=%f \n", params[alpha_g_], params[beta_g_], gxp[offset], gyp[offset], g1p[offset], sqrt(gx*gx + gy*gy), pow(sqrt(gx*gx + gy*gy), betaG) );
  }
 
  __kernel void UpdateQD(
@@ -240,7 +241,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 
 	 dpt[pt] = (d + sigma_d * (g1*div_q + a/theta)) / (1.0f + sigma_d/theta);
 
-	 if (x==100 && y==100) printf("\ndpt[pt]=%f, d=%f, sigma_q=%f, epsilon=%f, g1=%f, div_q=%f, a=%f, theta=%f, sigma_d=%f, qx=%f, qy=%f, maxq=%f, dd_x=%f, dd_y=%f ", \
+	 //if (x==100 && y==100) printf("\ndpt[pt]=%f, d=%f, sigma_q=%f, epsilon=%f, g1=%f, div_q=%f, a=%f, theta=%f, sigma_d=%f, qx=%f, qy=%f, maxq=%f, dd_x=%f, dd_y=%f ", \
 		 dpt[pt], d, sigma_q, epsilon, g1, div_q , a, theta, sigma_d, qx, qy, maxq, dd_x, dd_y );
  }
 
@@ -336,6 +337,7 @@ float get_Eaux(float theta, float di, float aIdx, float far, float depthStep, fl
 	}
 	apt[pt] = a;
 
-	if (x==200 && y==200) printf("\n\nUpdateA: theta=%f, lambda=%f, hi=%f, lo=%f, r=%f, d=%f, min_d=%f, max_d=%f, minl=%f, depthStep=%f, layers=%i, start_layer=%i, end_layer=%i", \
-		theta, lambda, hi[pt], lo[pt], r, d, min_d, max_d, minl, depthStep, layers, start_layer, end_layer );
+	//if (x==200 && y==200) printf("\n\nUpdateA: theta=%f, lambda=%f, hi=%f, lo=%f, r=%f, d=%f, min_d=%f, max_d=%f, minl=%f, depthStep=%f, layers=%i, start_layer=%i, end_layer=%i", \
+	//	theta, lambda, hi[pt], lo[pt], r, d, min_d, max_d, minl, depthStep, layers, start_layer, end_layer );
+		
  }

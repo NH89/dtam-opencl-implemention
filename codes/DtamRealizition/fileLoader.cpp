@@ -15,26 +15,32 @@ static vector<fs::path> depth;
 
 void get_all(const fs::path& root, const string& ext, vector<fs::path>& ret);
 
-void loadAhanda(const char * rootpath,
-                float range,// unsed
+void loadAhanda( std::string rootpath, // const char *
+                //float range,// unsed
                 int imageNumber,
                 Mat& image,
                 Mat& d,
                 Mat& cameraMatrix,
                 Mat& R,
                 Mat& T){
-    if(root!=string(rootpath)){
-        root=string(rootpath);
+    if(root!=rootpath){                   // string(rootpath)){
+        root=rootpath;                    // string(rootpath);
         get_all(root, ".txt", txt);                            // gathers all filepaths with each suffix, into c++ vectors.
         get_all(root, ".png", png);
         get_all(root, ".depth", depth);
                 cout<<"Loading......"<<endl;
     }
+    cout << "\nfilepath: "<< string(rootpath) << "\n" << flush;
+    cout << "\n" << txt[imageNumber].c_str();
+    cout << "\n" << png[imageNumber].c_str();
+    cout << "\n" << depth[imageNumber].c_str();
+    cout << "\n" << flush;
+    
     std::string str = txt[imageNumber].c_str();                // grab .txt filename from array (e.g. "scene_00_0000.txt")
     char        *ch = new char [str.length()+1];
     std::strcpy (ch, str.c_str());
     convertAhandaPovRayToStandard(ch,R,T,cameraMatrix);        // compute R, T & cameraMatrix from "*.txt"
-    cout<<"Loading image......"<<endl;
+    cout<<"Loading image......"<<endl<< flush;
     image = imread(png[imageNumber].string());                 // Read image
     /*
     cv::imshow("loadAhanda png", image);

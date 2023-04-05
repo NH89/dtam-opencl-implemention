@@ -1,7 +1,7 @@
 //#include "stdafx.h"     // windows precompiled header file
 #include "CostVol.h"
 //#include <opencv2/core/operations.hpp>
-#include <opencv2/viz.hpp>
+//#include <opencv2/viz.hpp>
 #include <fstream>
 #include <iomanip>   // std::setprecision, std::setw
 

@@ -9,6 +9,8 @@
 #include <string>		// /usr/include/c++/11/string
 #include <sstream>		// /usr/include/c++/11/sstream
 
+#define DATASETS "/home/hockingsn/Programming/computer_vision_data/"   //  /home/nick/programming/ComputerVision/DataSets
+
 using namespace cv;
 using namespace std;
 int main()
@@ -46,18 +48,23 @@ int main()
 	int inc = 1;
 
 	cout << "\n main_chk 2\n" << flush;
+	stringstream ss0;
+	ss0 << DATASETS << "ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve";
+	
+	
 	for (int i =0; i < imagesPerCV; i += inc) {								// Load images & data from file into c++ vectors
 		Mat tmp, d, image;
 		int offset = 0;//475;							//10;//46;//462;//380;//0;	// better location in this dataset for translation for paralax flow.
 																			// TODO use a control file specifying where to sample the video.
-		loadAhanda(//"/home/nick/Programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj3_loop",
+		loadAhanda( ss0.str(),
+			//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj3_loop",
 				   //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/20fps/20fps_GT_archieve (1)", // does not work
-					"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
+					//"DATASETS/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
 				    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
 					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
 					//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
-			65535,	//range, unused
+			//65535,	//range, unused
 			i + offset,
 			image,															// NB .png image is converted CV_8UC3 -> CV_32FC3, and given GaussianBlurr (3,3).
 			d,
@@ -90,13 +97,14 @@ int main()
 	cout << "\n main_chk 3\n" << flush; 									//Setup camera matrix
 	float sx 					= reconstructionScale;
 	float sy 					= reconstructionScale;
-	int   layers 				= 256; //64;										//32;//
+	int   layers 				= 256;//128;//256; //64;										//32;//
 	float min_inv_depth 		= 1.0/450.0;	//1.0/4347.0; //							//far// NB see values in DTAM_mapping/input/*.json file for each dataset.
 	float max_inv_depth 		= 1.0/70.0;	//1.0/3289.0; //
 	float occlusionThreshold 	= .05;
 	int   startAt 				= 0;
 	cout<<"images[startAt].size="<<images[startAt].size<<"\n";
-																			// Instantiate CostVol ///////////
+
+	cout << "\n main_chk 3.1\n" << flush; 									// Instantiate CostVol ///////////
 	CostVol cv(images[startAt], (FrameID)startAt, layers, max_inv_depth, min_inv_depth, Rs[startAt], Ts[startAt], cameraMatrix, occlusionThreshold, out_path /* float initialCost=1.0, float initialWeight=0.001*/ );
 
 	cout << "\n main_chk 4\tcalculate cost volume: ================================================" << endl << flush;

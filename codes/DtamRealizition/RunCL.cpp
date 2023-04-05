@@ -17,7 +17,7 @@ RunCL::RunCL(boost::filesystem::path out_path) 										// constructor
 	if (numPlatforms > 0){															/*Choose the platform.*/
 		cl_platform_id* 	platforms = (cl_platform_id*)malloc(numPlatforms * sizeof(cl_platform_id));
 		status 	= clGetPlatformIDs(numPlatforms, platforms, NULL);					if (status != CL_SUCCESS){ cout << "Error: Getting platformsIDs" << endl; exit_(status); }
-		int n=0;				 													// rx6400=0 or gtx3080=1 ########## Choose GPU here #### NB Avoid sharing GPU with GUI #################
+		int n=2;				 													// rx6400=0 or gtx3080=1 ########## Choose GPU here #### NB Avoid sharing GPU with GUI #################
 		platform = platforms[n]; 													//0 or 1 , Need to choose platform and GPU ########## Choose platform ########### TODO replace with launch yaml file.
 		free(platforms);
 		cout << "\nplatforms[0] = "<<platforms[0]<<", \nplatforms[1] = "<<platforms[1]<<"\nSelected platform number :"<<n<<", cl_platform_id platform = " << platform<<"\n"<<flush;
@@ -41,8 +41,8 @@ RunCL::RunCL(boost::filesystem::path out_path) 										// constructor
 	deviceId  = devices[0];																													/*Step 4: Creating command queue associate with the context.*/
 	cl_command_queue_properties prop[] = { 0 };						//  all queues are in-order by default.
 	m_queue = clCreateCommandQueueWithProperties(m_context, deviceId, prop, &status);	if(status!=CL_SUCCESS)	{cout<<"\nstatus="<<checkerror(status)<<"\n"<<flush;exit_(status);}
-
-	const char *filename = "/home/nick/Programming/ComputerVision/DTAM/dtam-opencl-implemention/codes/DtamRealizition/DTAM_kernels2.cl";	/*Step 5: Create program object *//////////////
+	
+	const char *filename = "../codes/DtamRealizition/DTAM_kernels2.cl";	/*Step 5: Create program object *//////////////  /home/nick/Programming/ComputerVision/DTAM/dtam-opencl-implemention/
 	string sourceStr;
 	status 						= convertToString(filename, sourceStr);					if(status!=CL_SUCCESS)	{cout<<"\nstatus="<<checkerror(status)<<"\n"<<flush;exit_(status);}
 	const char 	*source 		= sourceStr.c_str();
@@ -295,11 +295,11 @@ void RunCL::allocatemem(float* gx, float* gy, float* params, int layers, cv::Mat
 		cout<<"\nglobal_work_size="<<global_work_size<<", local_work_size="<<local_work_size<<", deviceId="<<deviceId<<"\n"<<flush;
 		cout<<"\nlayerstep=width*height="<<width<<"*"<<height<<"="<<layerstep<<",\tsizeof(layerstep)="<< sizeof(layerstep) <<",\tsizeof(int)="<< sizeof(int) <<flush;
 		cout<<"\n";
-		cout <<"\nallocatemem chk1, baseImage.total()=" << baseImage.total() << ", sizeof(float)="<< sizeof(float)<<flush;
-		cout <<"\nbaseImage.elemSize()="<< baseImage.elemSize()<<", baseImage.elemSize1()="<<baseImage.elemSize1()<<flush;
-		cout <<"\nbaseImage.type()="<< baseImage.type() <<", sizeof(baseImage.type())="<< sizeof(baseImage.type())<<flush;
+		cout<<"\nallocatemem chk1, baseImage.total()=" << baseImage.total() << ", sizeof(float)="<< sizeof(float)<<flush;
+		cout<<"\nbaseImage.elemSize()="<< baseImage.elemSize()<<", baseImage.elemSize1()="<<baseImage.elemSize1()<<flush;
+		cout<<"\nbaseImage.type()="<< baseImage.type() <<", sizeof(baseImage.type())="<< sizeof(baseImage.type())<<flush;
 		cout<<"\n";
-		cout <<"\nallocatemem chk2, image_size_bytes="<< image_size_bytes <<  ", sizeof(float)="<< sizeof(float)<<flush;
+		cout<<"\nallocatemem chk2, image_size_bytes="<< image_size_bytes <<  ", sizeof(float)="<< sizeof(float)<<flush;
 	}
 	cl_int res;
 	dmem		= clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * sizeof(float), 0, &res);	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
@@ -316,7 +316,7 @@ void RunCL::allocatemem(float* gx, float* gy, float* params, int layers, cv::Mat
 	hdatabuf 	= clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * layers * sizeof(float), 0, &res);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	imgmem		= clCreateBuffer(m_context, CL_MEM_READ_ONLY  , 					   image_size_bytes, 0, &res);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	basemem		= clCreateBuffer(m_context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,  image_size_bytes, 0, &res);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-	k2kbuf		= clCreateBuffer(m_context, CL_MEM_READ_ONLY  ,  			16*sizeof(float), 0, &res); 	if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	k2kbuf		= clCreateBuffer(m_context, CL_MEM_READ_ONLY  ,  					   16*sizeof(float), 0, &res); 		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	img_sum_buf = clCreateBuffer(m_context, CL_MEM_READ_WRITE , width * height * layers * sizeof(float), 0, &res);		if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 
 
@@ -459,6 +459,16 @@ void RunCL::calcCostVol(float* k2k,  cv::Mat &image)
 
 void RunCL::cacheGValue2(cv::Mat &bgray, float theta)
 {
+	cl_int 		res;
+//#
+	cl_device_id  param_value;
+	size_t param_value_size_ret; // CL_QUEUE_SIZE is only supported for device command queues.
+	cl_uint res_ = clGetCommandQueueInfo(m_queue, CL_QUEUE_DEVICE, sizeof(cl_device_id), &param_value, &param_value_size_ret); 
+	if(res_!=CL_SUCCESS){cout<<"\nclGetCommandQueueInfo res = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	cout << "\nclGetCommandQueueInfo(m_queue, CL_QUEUE_DEVICE,..) = " << param_value << flush;
+	cout << "\nm_queue="<<m_queue<<flush;
+//#
+	
 	cout<<"\ncacheGValue2_chk0"<<flush;
 	params[THETA]	=  theta;
 	cl_int status;
@@ -470,15 +480,15 @@ void RunCL::cacheGValue2(cv::Mat &bgray, float theta)
 
 	stringstream ss;
 	ss << "cacheGValue2";
-	cl_int 		res;
-	cl_event 	ev;
+	
+	cl_event 	ev1, ev2;
 	size_t 		bgraySize_bytes = bgray.total() * bgray.elemSize();
 	float 		beta;
 	if (theta>0.001) beta=0.001; else beta=0.0001;
 
 	if (basegraymem == 0) {
 		basegraymem = clCreateBuffer(m_context, CL_MEM_READ_ONLY , bgraySize_bytes, 0, &res);
-		status 		= clEnqueueWriteBuffer(m_queue, basegraymem, CL_FALSE, 0, width * height * sizeof(float), bgray.data, 0, NULL, &ev);	// WriteBuffer basegraymem ##########
+		status 		= clEnqueueWriteBuffer(m_queue, basegraymem, CL_FALSE, 0, width * height * sizeof(float), bgray.data, 0, NULL, &ev1);	// WriteBuffer basegraymem ##########
 		if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 		clFlush(m_queue); clFinish(m_queue); if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 	}
@@ -487,18 +497,31 @@ void RunCL::cacheGValue2(cv::Mat &bgray, float theta)
 	res = clSetKernelArg(cache3_kernel, 2, sizeof(cl_mem), &gymem);		 if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(cache3_kernel, 3, sizeof(cl_mem), &g1mem);		 if(res!=CL_SUCCESS){cout<<"\nres = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
 	res = clSetKernelArg(cache3_kernel, 4, sizeof(cl_mem), &param_buf);	 if(res!=CL_SUCCESS){cout<<"\nparam_buf res = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
-
-	clFlush(m_queue); clFinish(m_queue); if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
-	res = clEnqueueNDRangeKernel(m_queue, cache3_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev);											// run cache1_kernel  aka CacheG1(..) ##########
-	clFlush(m_queue); clFinish(m_queue); if (res != CL_SUCCESS)	{ cout << "\nres = " << checkerror(res) <<"\n"<<flush; exit_(res);}
+	
+	//cout << "\n global_work_size1 = " << global_work_size << "\n" << flush;
+	//size_t test_work_size = global_work_size/8;
+	
+	clFlush(m_queue); clFinish(m_queue); if (res != CL_SUCCESS)	{ cout << "\nbefore cache3_kernel res = " << checkerror(res) <<"\n"<<flush; exit_(res);}
+	res = clEnqueueNDRangeKernel(m_queue, cache3_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev2);											// run cache1_kernel  aka CacheG1(..) ##########
+	clFlush(m_queue); clFinish(m_queue); if (res != CL_SUCCESS)	{ cout << "\nafter cache3_kerne res = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 
 	ss << (keyFrameCount);
-	DownloadAndSave(basegraymem, ss.str(), paths.at("basegraymem"), width * height * sizeof(float) , baseImage_size, CV_32FC1, 		 true, 1);
-	DownloadAndSave(gxmem,		 ss.str(), paths.at("gxmem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1, 		 true, 1);
-	DownloadAndSave(gymem, 		 ss.str(), paths.at("gymem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1, 		 true, 1);
-	DownloadAndSave(g1mem, 		 ss.str(), paths.at("g1mem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1, 		 true, 1);
-
-	clFlush(m_queue); clFinish(m_queue);
+	cout << "\n ss.str() = " << ss.str() << "\n" << flush;
+	cout << "\n global_work_size2 = " << global_work_size << "\n" << flush;
+	
+//#
+	res_ = clGetCommandQueueInfo(m_queue, CL_QUEUE_DEVICE, sizeof(cl_device_id), &param_value, &param_value_size_ret);
+	if(res!=CL_SUCCESS){cout<<"\nclGetCommandQueueInfo res = "<<checkerror(res)<<"\n"<<flush;exit_(res);}
+	cout << "\nclGetCommandQueueInfo(m_queue, CL_QUEUE_DEVICE,..) = " << param_value << flush;
+	
+	cout << "\nm_queue =  " << m_queue << flush;
+	
+	//DownloadAndSave(basegraymem, ss.str(), paths.at("basegraymem"), width * height * sizeof(float) , baseImage_size, CV_32FC1, 		false /*true*/, 1); // imshow(..) not working ? prob not the problem...
+	//DownloadAndSave(gxmem,		 ss.str(), paths.at("gxmem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1, 		false /*true*/, 1);
+	//DownloadAndSave(gymem, 		 ss.str(), paths.at("gymem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1, 		false /*true*/, 1);
+	DownloadAndSave(g1mem, 		 ss.str(), paths.at("g1mem"), 		width * height * sizeof(float) , baseImage_size, CV_32FC1, 		false /*true*/, 1);
+	
+	//clFlush(m_queue); clFinish(m_queue);
 	keyFrameCount++;
 	cout<<"\ncacheGValue_finished"<<flush;
 }
