@@ -1,9 +1,11 @@
-#include "/usr/local/include/opencv4/opencv2/core/core.hpp"//<opencv2/core/core.hpp>
-#include "/usr/local/include/opencv4/opencv2/imgproc/imgproc.hpp"//<opencv2/imgproc/imgproc.hpp>
-#include "/usr/local/include/opencv4/opencv2/imgproc/imgproc_c.h" // req for types e.g. CV_BGR2GRAY
-#include "/usr/local/include/opencv4/opencv2/calib3d/calib3d.hpp"//<opencv2/calib3d/calib3d.hpp>
 #ifndef DTAM_UTILS_HPP
 #define DTAM_UTILS_HPP
+
+#include <opencv2/core/core.hpp> // "/usr/local/include/opencv4/opencv2/core/core.hpp"//
+#include <opencv2/imgproc/imgproc.hpp> // "/usr/local/include/opencv4/opencv2/imgproc/imgproc.hpp"//
+#include <opencv2/imgproc/imgproc_c.h> // "/usr/local/include/opencv4/opencv2/imgproc/imgproc_c.h" // req for types e.g. CV_BGR2GRAY
+#include <opencv2/calib3d/calib3d.hpp> // "/usr/local/include/opencv4/opencv2/calib3d/calib3d.hpp"//
+
 using namespace cv;
 
 struct m33 {
