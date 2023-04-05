@@ -4,7 +4,7 @@
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #define CL_HPP_MINIMUM_OPENCL_VERSION		200
-#define CL_TARGET_OPENCL_VERSION			200
+#define CL_TARGET_OPENCL_VERSION			200		// defined as 120 in CMakeLists.txt 
 #define CL_HPP_TARGET_OPENCL_VERSION		200  // OpenCL 1.2
 
 #include <CL/opencl.hpp>	//<CL/cl.hpp>
@@ -230,8 +230,6 @@ public:
 		cl_event readEvt;
 		cl_int status;
 		cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<", offset="<<offset<<"\t"<<flush;
-		//status = clFlush(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = "<<status<<" "<< checkerror(status) <<"\n"<<flush; exit_(status);}
-		//status = clFinish(m_queue);		if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="		<<status<<" "<< checkerror(status) <<"\n"<<flush; exit_(status);}
 		status = clEnqueueReadBuffer(m_queue,
 											buf_mem,
 											CL_FALSE,
@@ -245,9 +243,8 @@ public:
 												else cout <<"\nclEnqueueReadBuffer(..)"<<flush;
 		status = clFlush(m_queue);				if (status != CL_SUCCESS) { cout << "\nclFlush(m_queue) status = " 		<< checkerror(status) <<"\n"<<flush; exit_(status);}
 												else cout <<"\nclFlush(..)"<<flush;
-		//status = clWaitForEvents(1, &readEvt); 	if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);}
-												//else cout <<"\nclWaitForEvents(..)"<<flush;
-		status = clFinish(m_queue);				if (status != CL_SUCCESS) { cout << "\nclFinish(m_queue)=" 				<< checkerror(status) <<"\n"<<flush; exit_(status);}
+		status = clWaitForEvents(1, &readEvt); 	if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);}
+												else cout <<"\nclWaitForEvents(..)"<<flush;
 	}
 };
 
