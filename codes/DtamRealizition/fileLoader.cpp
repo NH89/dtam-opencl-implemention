@@ -22,7 +22,8 @@ void loadAhanda( std::string rootpath, // const char *
                 Mat& d,
                 Mat& cameraMatrix,
                 Mat& R,
-                Mat& T){
+                Mat& T,
+                int verbosity_){
     if(root!=rootpath){                   // string(rootpath)){
         root=rootpath;                    // string(rootpath);
         get_all(root, ".txt", txt);                            // gathers all filepaths with each suffix, into c++ vectors.
@@ -30,17 +31,18 @@ void loadAhanda( std::string rootpath, // const char *
         get_all(root, ".depth", depth);
                 cout<<"Loading......"<<endl;
     }
-    cout << "\nfilepath: "<< string(rootpath) << "\n" << flush;
-    cout << "\n" << txt[imageNumber].c_str();
-    cout << "\n" << png[imageNumber].c_str();
-    cout << "\n" << depth[imageNumber].c_str();
-    cout << "\n" << flush;
-    
+    if(verbosity_>0) {
+      cout << "\nfilepath: "<< string(rootpath) << "\n" << flush;
+      cout << "\n" << txt[imageNumber].c_str();
+      cout << "\n" << png[imageNumber].c_str();
+      cout << "\n" << depth[imageNumber].c_str();
+      cout << "\n" << flush;
+    }
     std::string str = txt[imageNumber].c_str();                // grab .txt filename from array (e.g. "scene_00_0000.txt")
     char        *ch = new char [str.length()+1];
     std::strcpy (ch, str.c_str());
     convertAhandaPovRayToStandard(ch,R,T,cameraMatrix);        // compute R, T & cameraMatrix from "*.txt"
-    cout<<"Loading image......"<<endl<< flush;
+    if(verbosity_>0) cout<<"Loading image......"<<endl<< flush;
     image = imread(png[imageNumber].string());                 // Read image
     /*
     cv::imshow("loadAhanda png", image);
@@ -63,7 +65,7 @@ void loadAhanda( std::string rootpath, // const char *
     int r = image.rows;
     int c = image.cols;
     if(depth.size()>0){
-        cout<<"\nDepth: " <<depth[imageNumber].filename().string()<<"\t";
+        if(verbosity_>0) cout<<"\nDepth: " <<depth[imageNumber].filename().string()<<"\t";
         d = loadDepthAhanda(depth[imageNumber].string(), r,c,cameraMatrix);
     }
 }

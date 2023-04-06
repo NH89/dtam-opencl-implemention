@@ -10,7 +10,8 @@ void loadAhanda(std::string rootpath, //const char * rootpath,
                 cv::Mat& d,
                 cv::Mat& cameraMatrix,
                 cv::Mat& R,
-                cv::Mat& T);
+                cv::Mat& T,
+                int verbosity_ = -1);
 cv::Mat loadDepthAhanda(std::string filename, int r,int c,cv::Mat cameraMatrix);
 
 #endif

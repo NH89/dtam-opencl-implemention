@@ -91,9 +91,11 @@ CostVol::CostVol(
 	float 		occlusionThreshold,
 	boost::filesystem::path 	out_path,
 	float 		initialCost,	 							// NB defaults: float initialCost = 3.0, float initialWeight = .001
-	float 		initialWeight
-) : cvrc(out_path), initialWeight(initialWeight), occlusionThreshold(occlusionThreshold), R(R), T(T)  // constructors for member classes //
+	float 		initialWeight,
+	int			verbosity_
+) : cvrc(out_path, verbosity_), initialWeight(initialWeight), occlusionThreshold(occlusionThreshold), R(R), T(T)  // constructors for member classes //
 {
+	verbosity = verbosity_;
 	if(verbosity>0) cout << "CostVol_chk 0\n" << flush;
 	/*
 	 *  Inverse of a transformation matrix:
@@ -154,16 +156,19 @@ CostVol::CostVol(
 	}
 
 	if(verbosity>0) cout << "\n\nCostVol_chk 4\n" << flush;
-	float fx   =  K.operator()(0,0);  cout<<"\nfx="  <<fx;
-	float fy   =  K.operator()(1,1);  cout<<"\nfy="  <<fy;
-	float skew =  K.operator()(0,1);  cout<<"\nskew="<<skew;
-	float cx   =  K.operator()(0,2);  cout<<"\ncx="  <<cx;
-	float cy   =  K.operator()(1,2);  cout<<"\ncy="  <<cy;
+	float fx   =  K.operator()(0,0);
+	float fy   =  K.operator()(1,1);
+	float skew =  K.operator()(0,1);
+	float cx   =  K.operator()(0,2);
+	float cy   =  K.operator()(1,2);
 
-	if(verbosity>0) cout << "\n\nCostVol_chk 5\n" << flush;
+	if(verbosity>0) {
+		cout<<"\nfx="<<fx <<"\nfy="<<fy <<"\nskew="<<skew <<"\ncx="<<cx <<"\ncy= "<<cy;
+		cout << "\n\nCostVol_chk 5\n" << flush;
+	}
 	///////////////////////////////////////////////////////////////////// Inverse camera intrinsic matrix, see:
 	// https://www.imatest.com/support/docs/pre-5-2/geometric-calibration-deprecated/projective-camera/#:~:text=Inverse,lines%20from%20the%20camera%20center.
-	float scalar = 1/(fx*fy);
+	//float scalar = 1/(fx*fy);
 	inv_K = inv_K.zeros();
 	inv_K.operator()(0,0)  = 1.0/fx;  cout<<"\n1.0/fx="<<1.0/fx;
 	inv_K.operator()(1,1)  = 1.0/fy;  cout<<"\n1.0/fy="<<1.0/fy;
@@ -245,7 +250,6 @@ CostVol::CostVol(
 	hit      = Mat::zeros(layers, rows * cols, CV_32FC1);
 	hit      = initialWeight;
 	img_sum_data = Mat::zeros(layers, rows * cols, CV_32FC1);
-
 	
 	FLATALLOC(lo);		// TODO get rid of this. Get to
 	FLATALLOC(hi);		// (i)  one record of rows & cols,
@@ -444,7 +448,7 @@ void CostVol::writePointCloud(cv::Mat depthMap)
 	cv::Mat tempImage = 255 * baseImage.reshape(0, rows*cols);
 
 	cv::Mat pointCloud(depthMap.size(), CV_32FC3);
-	cout <<"\na)pointCloud.size = " << pointCloud.size() << "\n"<<flush;
+	if(verbosity>0) cout <<"\na)pointCloud.size = " << pointCloud.size() << "\n"<<flush;
 
 	for (int u=0; u<rows ; u++){
 		for (int v=0; v<cols ; v++){
@@ -452,21 +456,21 @@ void CostVol::writePointCloud(cv::Mat depthMap)
 			pointCloud.at<Vec3f>(u,v) = cv::Vec3f(homogeneousPoint[0], homogeneousPoint[1], homogeneousPoint[2]) /homogeneousPoint[3];
 		}
 	}
-	cv::imshow("pointCloud depthmap", pointCloud );
+	if(verbosity>0) cv::imshow("pointCloud depthmap", pointCloud );
 	pointCloud = pointCloud.reshape(0, rows*cols);
 
-	cout << "\nb)pointCloud.size() = " << pointCloud.size() << "\tinv_K.size() = ‘class cv::Matx<float, 4, 4>’\n"<<flush;
+	if(verbosity>0) cout << "\nb)pointCloud.size() = " << pointCloud.size() << "\tinv_K.size() = ‘class cv::Matx<float, 4, 4>’\n"<<flush;
 
 	boost::filesystem::path folder_results  =  cvrc.paths.at("amem");
 	stringstream ss;
 	ss << folder_results.parent_path().string() << "/depthmap.pts"  ;
-	cout << "\nDepthmap file : " << ss.str() << "\n" << flush;
+	if(verbosity>0) cout << "\nDepthmap file : " << ss.str() << "\n" << flush;
 	char buf[256];
     sprintf ( buf, "%s", ss.str().data() ); // /depthmap.xyz   folder_results.parent_path().string()
-	cout << "buf"<< buf << "\n" << flush;
+	if(verbosity>0) cout << "buf"<< buf << "\n" << flush;
 	FILE* fp = fopen ( buf, "w" );
 	if (fp == NULL) {
-        std::cout << "\nvoid CostVol::writePointCloud(cv::Mat depthMap)  Could not open file "<< fp <<"\n"<< std::flush;
+        cout << "\nvoid CostVol::writePointCloud(cv::Mat depthMap)  Could not open file "<< fp <<"\n"<< std::flush;
         assert(0);
     }
     fprintf(fp, "%u\n", rows*cols);
@@ -475,7 +479,7 @@ void CostVol::writePointCloud(cv::Mat depthMap)
 	}
 	fclose ( fp );
     fflush ( fp );
-	cout << "\nwritePointCloud(..) finished\n" << flush;
+	if(verbosity>0) cout << "\nwritePointCloud(..) finished\n" << flush;
 }
 
 void CostVol::GetResult()

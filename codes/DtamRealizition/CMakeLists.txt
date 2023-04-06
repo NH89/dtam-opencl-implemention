@@ -40,6 +40,7 @@ endif()
 
 find_package(OpenCL REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(jsoncpp REQUIRED)
 
 if( OpenCV_FOUND )
   # Additional Include Directories
@@ -83,6 +84,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         OpenCL::OpenCL  
         ${OpenCV_LIBS} 
         Boost::filesystem
+        jsoncpp_lib
         )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES C_STANDARD 11

@@ -37,12 +37,13 @@
 #define LAMBDA			13	//   __kernel void UpdateA2
 #define SCALE_EAUX		14
 
-#define verbosity		0	// -1= none, 0=errors only, 1=basic, 2=lots.
+//#define verbosity		0	// -1= none, 0=errors only, 1=basic, 2=lots.
 
 using namespace std;
 class RunCL
 {
 public:
+	int					verbosity;
 	std::vector<cl_platform_id> m_platform_ids;
 	cl_context			m_context;
 	cl_device_id		m_device_id;
@@ -59,7 +60,7 @@ public:
 	cv::Size 			baseImage_size;
 	std::map< std::string, boost::filesystem::path > paths;
 
-	RunCL(boost::filesystem::path out_path);
+	RunCL(boost::filesystem::path out_path, int verbosity_ = -1);
 	void createFolders(boost::filesystem::path out_path); // NB called by RunCL(..) constructor, above.
 	void saveCostVols(float max_range);
 	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show, float max_range );
@@ -106,7 +107,7 @@ public:
 	}
 
 	int waitForEventAndRelease(cl_event *event){
-		cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
+		if(verbosity>0) cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
 		cl_int status = CL_SUCCESS;
 		status = clWaitForEvents(1, event); if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status=" << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
 		status = clReleaseEvent(*event); 	if (status != CL_SUCCESS) { cout << "\nclReleaseEvent status="  << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
@@ -239,12 +240,9 @@ public:
 											0,
 											NULL,
 											&readEvt);
-												if (status != CL_SUCCESS) { cout << "\nclEnqueueReadBuffer(..) status=" << checkerror(status) <<"\n"<<flush; exit_(status);}
-												else cout <<"\nclEnqueueReadBuffer(..)"<<flush;
-		status = clFlush(m_queue);				if (status != CL_SUCCESS) { cout << "\nclFlush(m_queue) status = " 		<< checkerror(status) <<"\n"<<flush; exit_(status);}
-												else cout <<"\nclFlush(..)"<<flush;
-		status = clWaitForEvents(1, &readEvt); 	if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);}
-												else cout <<"\nclWaitForEvents(..)"<<flush;
+												if (status != CL_SUCCESS) { cout << "\nclEnqueueReadBuffer(..) status=" << checkerror(status) <<"\n"<<flush; exit_(status);} else if(verbosity>0) cout <<"\nclEnqueueReadBuffer(..)"<<flush;
+		status = clFlush(m_queue);				if (status != CL_SUCCESS) { cout << "\nclFlush(m_queue) status = " 		<< checkerror(status) <<"\n"<<flush; exit_(status);} else if(verbosity>0) cout <<"\nclFlush(..)"<<flush;
+		status = clWaitForEvents(1, &readEvt); 	if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);} else if(verbosity>0) cout <<"\nclWaitForEvents(..)"<<flush;
 	}
 };
 

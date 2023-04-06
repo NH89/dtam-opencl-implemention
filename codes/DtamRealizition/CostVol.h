@@ -23,11 +23,12 @@ public:
 		 float occlusionThreshold,
 		 boost::filesystem::path out_path,
 		 float initialCost   = 1.0,//3.0,
-		 float initialWeight = .0000001
+		 float initialWeight = .0000001,
+		 int verbosity_ = -1
 		 );
 	RunCL   cvrc;
 	FrameID fid;
-	int     rows, cols, layers, count;
+	int     rows, cols, layers, count, verbosity;
 	//near & far : inverse depth of center of voxels in layer layers-1 //inverse depth of center of voxels in layer 0
 	float   near, far,  depthStep, initialWeight, occlusionThreshold;
 	Matx44f K, inv_K, pose, inv_pose;

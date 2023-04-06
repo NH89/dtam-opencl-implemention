@@ -1,0 +1,24 @@
+{
+    "verbosity":0,                                                                          //  -1= none, 0=errors only, 1=basic, 2=lots.
+    "data_path":"/home/hockingsn/Programming/computer_vision_data/",                        //  /home/nick/programming/ComputerVision/DataSets
+    "data_file":"ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
+                    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj3_loop",
+                    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/Trajectory_for_Variable_Frame-Rate/20fps/20fps_GT_archieve (1)", // does not work
+					//"DATASETS/ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
+				    //"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",  // offset 46
+					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/office_room/office_room_traj0_loop",
+					//"/home/nick/programming/ComputerVision/DataSets/ahanda-icl/LivingRoom'lt kt0'/living_room_traj0_loop",
+					//"/home/hockingsn/Programming/OpenCV/OpenDTAM/data/Trajectory_30_seconds",//"D:\\projects\\DTAM-master\\DTAM-master\\Trajectory_30_seconds\\",
+    "imagesPerCV":30,
+    "cameraMatrix":[481.20,   0.0,  319.5, 	0.0,  480.0,  239.5, 	0.0,    0.0,    1.0],
+    "":"",
+    "":"",
+    "":"",
+    "":"",
+    "":"",
+    "":"",
+    "":"",
+    "":"",
+    "":"",
+    "":""
+}
