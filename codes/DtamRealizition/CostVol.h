@@ -1,33 +1,34 @@
 #pragma once
 #include "utils.hpp"
 #include "RunCL.h"
-typedef int     FrameID;
-typedef size_t  st;
-#define CONSTT uint  rows, uint  cols, uint  layers, uint layerStep, float* hdata, float* cdata, float* lo, float* hi, float* loInd, float3* base,  float* bf
-#define downp  (point+w)
-#define upp    (point-w)
-#define rightp (point+1)
-#define leftp  (point-1)
-#define here   (point)
-#define gdown   gd[here]
-#define gup     gu[here]
-#define gleft   gl[here]
-#define gright  gr[here]
+//typedef int     FrameID;
+//typedef size_t  st;
+//#define CONSTT uint  rows, uint  cols, uint  layers, uint layerStep, float* hdata, float* cdata, float* lo, float* hi, float* loInd, float3* base,  float* bf
+//#define downp  (point+w)
+//#define upp    (point-w)
+//#define rightp (point+1)
+//#define leftp  (point-1)
+//#define here   (point)
+//#define gdown   gd[here]
+//#define gup     gu[here]
+//#define gleft   gl[here]
+//#define gright  gr[here]
 
 class CostVol
 {
 public:
 	~CostVol();
-	CostVol(cv::Mat image,  FrameID _fid,  int _layers,  float _near,  float _far,
+	CostVol(cv::Mat image, /*FrameID _fid,*/ // int _layers,  float _near,  float _far,
 		cv::Mat R,  cv::Mat T,  cv::Mat _cameraMatrix,
-		 float occlusionThreshold,
+		 //float occlusionThreshold,
 		 boost::filesystem::path out_path,
-		 float initialCost   = 1.0,//3.0,
-		 float initialWeight = .0000001,
+		 //float initialCost   = 1.0,//3.0,
+		 //float initialWeight = .0000001,
+		 Json::Value obj,
 		 int verbosity_ = -1
 		 );
 	RunCL   cvrc;
-	FrameID fid;
+	//FrameID fid;
 	int     rows, cols, layers, count, verbosity;
 	//near & far : inverse depth of center of voxels in layer layers-1 //inverse depth of center of voxels in layer 0
 	float   near, far,  depthStep, initialWeight, occlusionThreshold;
@@ -53,3 +54,5 @@ private:
 	void  checkInputs(    const cv::Mat& R,  const cv::Mat& T,   const cv::Mat& _cameraMatrix);
 	float old_theta, theta, thetaStart, thetaStep, thetaMin, epsilon, lambda, sigma_d, sigma_q;
 };
+
+

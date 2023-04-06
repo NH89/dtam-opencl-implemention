@@ -20,6 +20,7 @@
 #include <opencv2/highgui.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <jsoncpp/json/json.h>
 							// indices for float params passed to __const params_buf
 #define PIXELS			0	// TODO Can these be #included from a common header for both host and device code?
 #define ROWS			1
@@ -102,12 +103,12 @@ public:
 			delete[] str;
 			return 0;
 		}
-		cout << "Error: failed to open file\n:" << filename << endl;
+											cout << "Error: failed to open file\n:" << filename << endl;
 		return 1;
 	}
 
 	int waitForEventAndRelease(cl_event *event){
-		if(verbosity>0) cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
+											if(verbosity>0) cout << "\nwaitForEventAndRelease_chk0, event="<<event<<" *event="<<*event << flush;
 		cl_int status = CL_SUCCESS;
 		status = clWaitForEvents(1, event); if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status=" << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
 		status = clReleaseEvent(*event); 	if (status != CL_SUCCESS) { cout << "\nclReleaseEvent status="  << status << ", " <<  checkerror(status) <<"\n" << flush; exit_(status); }
@@ -230,7 +231,7 @@ public:
 	void ReadOutput(uchar* outmat, cl_mem buf_mem, size_t data_size, size_t offset=0) {
 		cl_event readEvt;
 		cl_int status;
-		cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<", offset="<<offset<<"\t"<<flush;
+														cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<", offset="<<offset<<"\t"<<flush;
 		status = clEnqueueReadBuffer(m_queue,
 											buf_mem,
 											CL_FALSE,
@@ -240,9 +241,12 @@ public:
 											0,
 											NULL,
 											&readEvt);
-												if (status != CL_SUCCESS) { cout << "\nclEnqueueReadBuffer(..) status=" << checkerror(status) <<"\n"<<flush; exit_(status);} else if(verbosity>0) cout <<"\nclEnqueueReadBuffer(..)"<<flush;
-		status = clFlush(m_queue);				if (status != CL_SUCCESS) { cout << "\nclFlush(m_queue) status = " 		<< checkerror(status) <<"\n"<<flush; exit_(status);} else if(verbosity>0) cout <<"\nclFlush(..)"<<flush;
-		status = clWaitForEvents(1, &readEvt); 	if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);} else if(verbosity>0) cout <<"\nclWaitForEvents(..)"<<flush;
+														if (status != CL_SUCCESS) { cout << "\nclEnqueueReadBuffer(..) status=" << checkerror(status) <<"\n"<<flush; exit_(status);} 
+															else if(verbosity>0) cout <<"\nclEnqueueReadBuffer(..)"<<flush;
+		status = clFlush(m_queue);						if (status != CL_SUCCESS) { cout << "\nclFlush(m_queue) status = " 		<< checkerror(status) <<"\n"<<flush; exit_(status);} 
+															else if(verbosity>0) cout <<"\nclFlush(..)"<<flush;
+		status = clWaitForEvents(1, &readEvt); 			if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);} 
+															else if(verbosity>0) cout <<"\nclWaitForEvents(..)"<<flush;
 	}
 };
 
