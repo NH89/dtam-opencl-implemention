@@ -38,6 +38,7 @@
     //"SIGMA_D":"",
     //"theta":"",                                                                   // incremented every step, from thetaStart above.
     "lambda":1.0,               ///  used in __kernel void UpdateA2
+    "L":4.0,                    ///  used in CostVol::computeSigmas
     "scale_E_aux":10000,                                                             // from DTAM_Mapping input/json/icl_numin.json    //1.0;
     
     "":"", // need file paths for building kernels

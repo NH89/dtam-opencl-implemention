@@ -75,21 +75,15 @@ void CostVol::checkInputs(
 
 CostVol::CostVol(
 	Mat 		image,
-	//FrameID 	_fid,
-	//int 		_layers,
-	//float 		_near,
-	//float 		_far,
 	cv::Mat 	R,
 	cv::Mat 	T,
 	cv::Mat 	_cameraMatrix,
-	//float 		occlusionThreshold,
 	boost::filesystem::path 	out_path,
-	//float 		initialCost,	 															// NB defaults: float initialCost = 3.0, float initialWeight = .001
-	//float 		initialWeight,
-	Json::Value obj,
-	int			verbosity_		// obj[""].asFloat()
-) : cvrc(out_path, verbosity_), /*initialWeight(obj["initialWeight"].asFloat()), occlusionThreshold(obj["occlusionThreshold"].asFloat()),*/ R(R), T(T)  // constructors for member classes //
+	Json::Value obj_,
+	int			verbosity_
+) : cvrc(out_path, verbosity_), R(R), T(T)  // constructors for member classes //
 {
+	obj = obj_;
 	verbosity = verbosity_;
 																							if(verbosity>0) cout << "CostVol_chk 0\n" << flush;
 																							/*
@@ -166,7 +160,7 @@ CostVol::CostVol(
 	inv_K.operator()(0,1)  = -skew/(fx*fy);
 	inv_K.operator()(0,2)  = (cy*skew - cx*fy)/(fx*fy);
 	inv_K.operator()(1,2)  = -cy/fy;
-																							if(verbosity>-1) {
+																							if(verbosity>1) {
 																								cv::Matx44f test_K = inv_K * K;
 																								cout<<"\n\ntest_camera_intrinsic_matrix inversion\n";	// Verify inv_K:
 																								for(int i=0; i<4; i++){
@@ -227,11 +221,11 @@ CostVol::CostVol(
 																								cout<< "layers="<<cvrc.params[LAYERS]<<",\tcvrc.params[INV_DEPTH_STEP]="<< cvrc.params[INV_DEPTH_STEP];
 																								cout<<"=("<<cvrc.params[MAX_INV_DEPTH]<<" - "<< cvrc.params[MIN_INV_DEPTH] <<") / ("<< cvrc.params[LAYERS] <<" -1 )\n" << flush;
 																							}
-	costdata = Mat::ones(layers, rows * cols, CV_32FC1);
-	costdata = obj["initialCost"].asFloat();
-	hit      = Mat::zeros(layers, rows * cols, CV_32FC1);
-	hit      = obj["initialWeight"].asFloat();
-	img_sum_data = Mat::zeros(layers, rows * cols, CV_32FC1);
+	costdata 		= Mat::ones(layers, rows * cols, CV_32FC1);
+	costdata 		= obj["initialCost"].asFloat();
+	hit      		= Mat::zeros(layers, rows * cols, CV_32FC1);
+	hit      		= obj["initialWeight"].asFloat();
+	img_sum_data 	= Mat::zeros(layers, rows * cols, CV_32FC1);
 	
 	FLATALLOC(_a);	// used for CostVol::GetResult(..)										// (ii) one allocation of buffers for data. -> DownLoadAndSave(..) offload & display use temp Mat objects.
 	FLATALLOC(_gx); // used for line 277 cvrc.allocatemem(...)								// #define FLATALLOC(n) n.create(rows, cols, CV_32FC1); n.reshape(0, rows);
@@ -248,40 +242,32 @@ CostVol::CostVol(
 	for (int i=0; i<img_sum_data.total(); i++) to_ptr[i]=from_ptr[i%baseImageGray.total()];	// tile baseImageGray onto img_sum_data.
 
 	count      = 0;
-	thetaStart = 0.2;				//0.2;		//200.0*off;								// DTAM paper & DTAM_Mapping has Theta_start = 0.2
-	//thetaMin   = 9.9e-8;			//1.0e-4;	//1.0*off;									// DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
-	thetaStep  = 0.87;				//0.97;
-	epsilon    = 1.0e-4;			//.1*off;
-	lambda     = 1.0;				//1.0;		//.001 / off;								// DTAM paper: lambda = 1 for 1st key frame, and 1/(1+0.5*min_depth) thereafter
+	//thetaMin   = 9.9e-8;						//1.0e-4;	//1.0*off;						// DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
+	thetaStart = obj["thetaStart"].asFloat();	// 0.2;		//0.2;	//200.0*off;			// DTAM paper & DTAM_Mapping has Theta_start = 0.2
+	thetaStep  = obj["thetaStep"].asFloat();	// 0.87;			//0.97;
+	epsilon    = obj["epsilon"].asFloat();		//  1.0e-4;			//.1*off;
+	lambda     = obj["lambda"].asFloat();		//  1.0;	//1.0;	//.001 / off;			// DTAM paper: lambda = 1 for 1st key frame, and 1/(1+0.5*min_depth) thereafter
 	theta      = thetaStart;
 	old_theta  = theta;
-
-	computeSigmas(epsilon, theta);																// lambda, theta, sigma_d, sigma_q set by CostVol::computeSigmas(..) in CostVol.h, called in CostVol::updateQD() below.
+	
+	cvrc.params[LAMBDA]			=  obj["lambda"].asFloat();										//lambda;		///   __kernel void UpdateA2
+	computeSigmas(epsilon, theta, obj["L"].asFloat() );																// lambda, theta, sigma_d, sigma_q set by CostVol::computeSigmas(..) in CostVol.h, called in CostVol::updateQD() below.
 	cvrc.params[BETA_G]			=  obj["beta_g"].asFloat();										//1.5;														// DTAM paper : beta=0.001 while theta>0.001, else beta=0.0001
 	cvrc.params[ALPHA_G]		=  obj["alpha_g"].asFloat()* pow(256,cvrc.params[BETA_G]);		//0.015 * pow(256,cvrc.params[BETA_G]);					///  __kernel void CacheG4, with correction for CV_8UC3 -> CV_32FC3
 	cvrc.params[EPSILON]		=  obj["epsilon"].asFloat();									//0.1;			///  __kernel void UpdateQD					// epsilon = 0.1
 	cvrc.params[SIGMA_Q]		=  sigma_q;// obj["sigma_q"].asFloat();//0.0559017;				// sigma_q = 0.0559017
 	cvrc.params[SIGMA_D]		=  sigma_d;
 	cvrc.params[THETA]			=  theta;
-	cvrc.params[LAMBDA]			=  obj["lambda"].asFloat();										//lambda;		///   __kernel void UpdateA2
 	cvrc.params[SCALE_EAUX]		=  obj["scale_E_aux"].asFloat();								//10000;		// from DTAM_Mapping input/json/icl_numin.json    //1.0;
 
 	cvrc.allocatemem( (float*)_gx.data, (float*)_gy.data, cvrc.params, layers, baseImage, (float*)costdata.data, (float*)hit.data, (float*)img_sum_data.data );
 																							if(verbosity>0) cout << "CostVol_chk 6\n" << flush;
 }
 
-void CostVol::computeSigmas(float epsilon, float theta){
-		float lambda, alpha, gamma, delta, mu, rho, sigma;
-		float L = 4;							//lower is better(longer steps), but in theory only >=4 is guaranteed to converge. For the adventurous, set to 2 or 1.44
-		lambda  = 1.0 / theta;
-		alpha   = epsilon;
-		gamma   = lambda;
-		delta   = alpha;
-		mu      = 2.0*std::sqrt(gamma*delta) / L;
-		rho     = mu / (2.0*gamma);
-		sigma   = mu / (2.0*delta);
-		sigma_d = rho;
-		sigma_q = sigma;
+void CostVol::computeSigmas(float epsilon, float theta, float L){
+		float mu	= 2.0*std::sqrt((1.0/theta)*epsilon) /L;
+		sigma_d		= mu / (2.0/ theta);
+		sigma_q 	= mu / (2.0*epsilon);
 }
 
 void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T) 
@@ -325,7 +311,7 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 
 	cv::Matx44f cam2cam = K * poseTransform * inv_pose *  inv_K;						// cam2cam pixel transform, NB requires Pixel=(u,v,1,1/z)^T
 
-																						if(verbosity>-1) {
+																						if(verbosity>1) {
 																							std::cout << std::fixed << std::setprecision(-1);								//  Inspect values in matricies ///////
 																							cout<<"\n\nposeTransform\n";
 																							for(int i=0; i<4; i++){
@@ -402,7 +388,7 @@ void CostVol::cacheGValues()
 
 void CostVol::updateQD()
 {														if(verbosity>1) cout<<"\nupdateQD_chk0, epsilon="<<epsilon<<" theta="<<theta<<flush;
-	computeSigmas(epsilon, theta);						if(verbosity>1) cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
+	computeSigmas(epsilon, theta, obj["L"].asFloat() );	if(verbosity>1) cout<<"\nupdateQD_chk1, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
 	cvrc.updateQD(epsilon, theta, sigma_q, sigma_d);	if(verbosity>1) cout<<"\nupdateQD_chk3, epsilon="<<epsilon<<" theta="<<theta<<" sigma_q="<<sigma_q<<" sigma_d="<<sigma_d<<flush;
 }
 

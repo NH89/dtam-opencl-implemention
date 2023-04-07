@@ -24,9 +24,10 @@ public:
 		 boost::filesystem::path out_path,
 		 //float initialCost   = 1.0,//3.0,
 		 //float initialWeight = .0000001,
-		 Json::Value obj,
+		 Json::Value obj_,
 		 int verbosity_ = -1
 		 );
+	Json::Value obj;
 	RunCL   cvrc;
 	//FrameID fid;
 	int     rows, cols, layers, count, verbosity;
@@ -44,7 +45,7 @@ public:
 	void updateQD();
 	bool updateA();
 	void GetResult();
-	void computeSigmas(float epsilon, float theta);
+	void computeSigmas(float epsilon, float theta, float L);
 	void writePointCloud(cv::Mat depthMap);
 
 private:
