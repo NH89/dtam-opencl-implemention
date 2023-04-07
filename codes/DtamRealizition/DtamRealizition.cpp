@@ -70,10 +70,10 @@ int main(int argc, char *argv[])
 																				}cout<<"\n"<< std::flush;
 																				cout << "\n main_chk 3\n" << flush; 							//Setup camera matrix
 																			}
-	int   layers 				= obj["layers"].asUInt();
-	float min_inv_depth 		= 1.0/obj["max_depth"].asFloat();
-	float max_inv_depth 		= 1.0/obj["min_depth"].asFloat();
-	float occlusionThreshold 	= obj["occlusionThreshold"].asFloat();
+	//int   layers 				= obj["layers"].asUInt();
+	//float min_inv_depth 		= 1.0/obj["max_depth"].asFloat();
+	//float max_inv_depth 		= 1.0/obj["min_depth"].asFloat();
+	//float occlusionThreshold 	= obj["occlusionThreshold"].asFloat();
 	int   startAt 				= obj["startAt"].asUInt();					if(verbosity_>0) cout<<"images[startAt].size="<<images[startAt].size<<"\n";
 																			if(verbosity_>0) cout << "\n main_chk 3.1\n" << flush; 				// Instantiate CostVol ///////////
 	//CostVol(cv::Mat image, cv::Mat R,  cv::Mat T,  cv::Mat _cameraMatrix, boost::filesystem::path out_path, Json::Value obj, int verbosity_ = -1);

@@ -25,10 +25,6 @@
     "initialWeight":0.0000001,
     "out_path":"",
     
-    //"rows":480,                                                                   // taken from the frist image
-    //"cols":640,
-    //"INV_DEPTH_STEP":"",                                                          // computed from : ( MAX_INV_DEPTH - MIN_INV_DEPTH ) / LAYERS 
-    
     "thetaStart":0.2,           //0.2;		//200.0*off;                            // DTAM paper & DTAM_Mapping has Theta_start = 0.2
     "thetaMin":9.9e-8,          //1.0e-4;	//1.0*off;                              // DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
     "thetaStep":0.87,
@@ -38,14 +34,14 @@
     
     "epsilon":1.0e-4,           ///  used in __kernel void UpdateQD	
     
-    //"SIGMA_Q":"",                                                                 // computed by CostVol::computeSigmas(..)
+    "sigma_q":0.0559017,                                                                 // computed by CostVol::computeSigmas(..)
     //"SIGMA_D":"",
     //"theta":"",                                                                   // incremented every step, from thetaStart above.
     "lambda":1.0,               ///  used in __kernel void UpdateA2
     "scale_E_aux":10000,                                                             // from DTAM_Mapping input/json/icl_numin.json    //1.0;
     
-    "":"",
-    "":"",
+    "":"", // need file paths for building kernels
+    "":"", // need platform & device GPU choices 
     "":"",
     "":"",
     "":""

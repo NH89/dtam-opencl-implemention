@@ -31,7 +31,7 @@ public:
 	//FrameID fid;
 	int     rows, cols, layers, count, verbosity;
 	//near & far : inverse depth of center of voxels in layer layers-1 //inverse depth of center of voxels in layer 0
-	float   near, far,  depthStep, initialWeight, occlusionThreshold;
+	float   near, far,  depthStep;//, initialWeight, occlusionThreshold;
 	Matx44f K, inv_K, pose, inv_pose;
 	Mat R, T, cameraMatrix, projection;												//Note! should be in OpenCV format //projects world coordinates (x,y,z) into (rows,cols,layers)
 	Mat baseImage, baseImageGray, costdata, hit, img_sum_data;

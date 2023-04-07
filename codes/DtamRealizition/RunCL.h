@@ -72,7 +72,7 @@ public:
 	void calcCostVol(float* k2k, cv::Mat &image); 						/*cv::Mat &baseImage,*/ /*float thresh, int layers*/ /*, float *cdata, float *hdata*/
 	void cacheGValue2(cv::Mat &bgray, float theta);
 	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
-	void updateA(int layers, float lambda, float theta);
+	void updateA ( float lambda, float theta );
 
 	void CleanUp();
 	void exit_(cl_int res);

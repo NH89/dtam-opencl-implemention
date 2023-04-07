@@ -525,7 +525,7 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 											}
 }
 
-void RunCL::updateA(int layers, float lambda, float theta)
+void RunCL::updateA(float lambda, float theta)
 {
 	params[THETA]			=  theta;
 	params[LAMBDA]			=  lambda;
