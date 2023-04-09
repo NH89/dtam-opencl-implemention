@@ -9,6 +9,7 @@ RunCL::RunCL(Json::Value obj_)
 {
 	obj = obj_;
 	verbosity = obj["verbosity"].asInt();
+	std::cout << "RunCL::RunCL verbosity = " << verbosity << std::flush;
 																						if(verbosity>0) cout << "\nRunCL_chk 0\n" << flush;
 	createFolders( );																	/*Step1: Getting platforms and choose an available one.*/////////
 	cl_uint 		numPlatforms;														//the NO. of platforms
@@ -498,7 +499,7 @@ void RunCL::updateQD(float epsilon, float theta, float sigma_q, float sigma_d)
 
 	cl_int status, res;
 	cl_event writeEvt, ev;
-	status = clEnqueueWriteBuffer(uload_queue, param_buf, CL_FALSE, 0, 16 * sizeof(float), params, 0, NULL, &writeEvt); 						// WriteBuffer param_buf ##########
+	status = clEnqueueWriteBuffer(uload_queue, param_buf, CL_FALSE, 0, 16 * sizeof(float), params, 0, NULL, &writeEvt); 					// WriteBuffer param_buf ##########
 	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; cout << "Error: updateQD_chk0\n"	<< endl; exit_(status);}
 	status = clFlush(uload_queue); 						if (status != CL_SUCCESS)	{ cout << "\nclFlush status = " 				<< checkerror(status) <<"\n"<<flush; exit_(status);}
 	status = waitForEventAndRelease(&writeEvt); 	if (status != CL_SUCCESS)	{ cout << "\nwaitForEventAndRelease status = " 	<< checkerror(status) <<"\n"<<flush; exit_(status);}

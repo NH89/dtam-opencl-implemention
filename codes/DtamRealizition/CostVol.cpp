@@ -83,6 +83,7 @@ CostVol::CostVol(
 {
 	obj = obj_;
 	verbosity = obj["verbosity"].asInt(); 
+	std::cout << "CostVol::CostVol verbosity = " << verbosity << std::flush;
 																							if(verbosity>0) cout << "CostVol_chk 0\n" << flush;
 																							/*
 																							*  Inverse of a transformation matrix:
