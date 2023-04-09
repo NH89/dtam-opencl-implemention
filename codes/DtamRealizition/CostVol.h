@@ -21,11 +21,11 @@ public:
 	CostVol(cv::Mat image, /*FrameID _fid,*/ // int _layers,  float _near,  float _far,
 		cv::Mat R,  cv::Mat T,  cv::Mat _cameraMatrix,
 		 //float occlusionThreshold,
-		 boost::filesystem::path out_path,
+		 //boost::filesystem::path out_path,
 		 //float initialCost   = 1.0,//3.0,
 		 //float initialWeight = .0000001,
-		 Json::Value obj_,
-		 int verbosity_ = -1
+		 Json::Value obj_//,
+		 //int verbosity_ = -1
 		 );
 	Json::Value obj;
 	RunCL   cvrc;

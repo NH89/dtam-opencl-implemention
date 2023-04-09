@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	float cam_matrix[9];
 	for (int i=0; i<9; i++){cam_matrix[i] = obj["cameraMatrix"][i].asFloat(); }
 	Mat cameraMatrix 	= Mat(Size(3,3), CV_32FC1 , cam_matrix  );			// TODO use Matx instead ?
-																			if(verbosity_>0) cout << "\n main_chk 1\n" << flush;  				// make output folders //
+	/*																		if(verbosity_>0) cout << "\n main_chk 1\n" << flush;  				// make output folders //
 	std::time_t   result  = std::time(nullptr);
 	std::string   out_dir = std::asctime(std::localtime(&result));
 	out_dir.pop_back(); 													// req to remove new_line from end of string.
@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
 	out_path +=  out_dir;													if(verbosity_>0) cout <<"Creating output directories: "<< out_path <<std::endl;
 	boost::filesystem::create_directory(out_path);
 	out_path += "/";														if(verbosity_>0) cout << "\n main_chk 1.2\n" << flush;
+	*/
 	vector<Mat> images, Rs, ds, Ts, Rs0, Ts0, D0;							if(verbosity_>0) cout << "\n main_chk 2\n" << flush;
 	stringstream ss0;
 	ss0 << obj["data_path"].asString() << obj["data_file"].asString();
@@ -77,7 +78,7 @@ int main(int argc, char *argv[])
 	int   startAt 				= obj["startAt"].asUInt();					if(verbosity_>0) cout<<"images[startAt].size="<<images[startAt].size<<"\n";
 																			if(verbosity_>0) cout << "\n main_chk 3.1\n" << flush; 				// Instantiate CostVol ///////////
 	//CostVol(cv::Mat image, cv::Mat R,  cv::Mat T,  cv::Mat _cameraMatrix, boost::filesystem::path out_path, Json::Value obj, int verbosity_ = -1);
-	CostVol cv(images[startAt], /*(FrameID)startAt, layers, max_inv_depth, min_inv_depth,*/ Rs[startAt], Ts[startAt], cameraMatrix, /*occlusionThreshold,*/ out_path, /* float initialCost=1.0, float initialWeight=0.001*/ obj, verbosity_);
+	CostVol cv(images[startAt], Rs[startAt], Ts[startAt], cameraMatrix, /*out_path,*/ obj/*, verbosity_*/);
 																			if(verbosity_>0) cout << "\n main_chk 4\tcalculate cost volume: ================================================" << endl << flush;
 	for (int imageNum = 1; imageNum < imagesPerCV; imageNum+=1){			// Update CostVol ////////////////
 		cv.updateCost(images[imageNum], Rs[imageNum], Ts[imageNum]);

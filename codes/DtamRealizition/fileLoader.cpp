@@ -15,17 +15,16 @@ static vector<fs::path> depth;
 
 void get_all(const fs::path& root, const string& ext, vector<fs::path>& ret);
 
-void loadAhanda( std::string rootpath, // const char *
-                //float range,// unsed
-                int imageNumber,
-                Mat& image,
-                Mat& d,
-                Mat& cameraMatrix,
-                Mat& R,
-                Mat& T,
-                int verbosity_){
-    if(root!=rootpath){                   // string(rootpath)){
-        root=rootpath;                    // string(rootpath);
+void loadAhanda( std::string rootpath,
+                 int imageNumber,
+                 Mat& image,
+                 Mat& d,
+                 Mat& cameraMatrix,
+                 Mat& R,
+                 Mat& T,
+                 int verbosity_){
+    if(root!=rootpath){
+        root=rootpath;
         get_all(root, ".txt", txt);                            // gathers all filepaths with each suffix, into c++ vectors.
         get_all(root, ".png", png);
         get_all(root, ".depth", depth);
@@ -49,13 +48,12 @@ void loadAhanda( std::string rootpath, // const char *
     */
     if (image.type() == CV_32FC3) {}
     else if(image.type() == CV_8UC3){
-      image.convertTo(image, CV_32F);                            // convert 8-bit uchar -> 32-bit float
+      image.convertTo(image, CV_32F);                          // convert 8-bit uchar -> 32-bit float
       image /= 256;
     }else{
       std::cout << "\n\nFileloader.cpp, loadAhanda(..) :  unhandled image type "<< image.type() <<"\n"<<std::flush;
       exit(0);
     }
-
     /*
     Mat temp;
     image.convertTo(temp, CV_8U);                              // NB need CV_U8 for imshow(..)

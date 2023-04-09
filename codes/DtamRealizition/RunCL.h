@@ -1,10 +1,9 @@
-//#pragma once
 #ifndef RUNCL_H
 #define RUNCL_H
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #define CL_HPP_MINIMUM_OPENCL_VERSION		200
-#define CL_TARGET_OPENCL_VERSION			200		// defined as 120 in CMakeLists.txt 
+#define CL_TARGET_OPENCL_VERSION			200  // defined as 120 in CMakeLists.txt 
 #define CL_HPP_TARGET_OPENCL_VERSION		200  // OpenCL 1.2
 
 #include <CL/opencl.hpp>	//<CL/cl.hpp>
@@ -35,20 +34,19 @@
 #define SIGMA_Q 		10									// sigma_q = 0.0559017
 #define SIGMA_D 		11
 #define THETA			12
-#define LAMBDA			13	//   __kernel void UpdateA2
+#define LAMBDA			13	//  __kernel void UpdateA2
 #define SCALE_EAUX		14
-
-//#define verbosity		0	// -1= none, 0=errors only, 1=basic, 2=lots.
 
 using namespace std;
 class RunCL
 {
 public:
+	Json::Value obj;
 	int					verbosity;
 	std::vector<cl_platform_id> m_platform_ids;
 	cl_context			m_context;
 	cl_device_id		m_device_id;
-	cl_command_queue	m_queue;
+	cl_command_queue	m_queue, uload_queue, dload_queue, track_queue;
 	cl_program			m_program;
 	cl_kernel			cost_kernel, cache3_kernel, cache4_kernel, updateQD_kernel, updateA_kernel;
 	cl_mem				basemem, imgmem, cdatabuf, hdatabuf, k2kbuf, dmem, amem, basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem, param_buf, img_sum_buf;
@@ -61,15 +59,15 @@ public:
 	cv::Size 			baseImage_size;
 	std::map< std::string, boost::filesystem::path > paths;
 
-	RunCL(boost::filesystem::path out_path, int verbosity_ = -1);
-	void createFolders(boost::filesystem::path out_path); // NB called by RunCL(..) constructor, above.
+	RunCL(Json::Value obj_);
+	void createFolders();	// Called by RunCL(..) constructor, above.
 	void saveCostVols(float max_range);
 	void DownloadAndSave(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show, float max_range );
 	void DownloadAndSave_3Channel(cl_mem buffer, std::string count, boost::filesystem::path folder_tiff, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show );
 	void DownloadAndSaveVolume(cl_mem buffer, std::string count, boost::filesystem::path folder, size_t image_size_bytes, cv::Size size_mat, int type_mat, bool show, float max_range );
 
-	void allocatemem(float* gx, float* gy, float* params, int layers, cv::Mat &baseImage, float *cdata, float *hdata, float *img_sum_data); 			/*float *qx, float *qy,*/
-	void calcCostVol(float* k2k, cv::Mat &image); 						/*cv::Mat &baseImage,*/ /*float thresh, int layers*/ /*, float *cdata, float *hdata*/
+	void allocatemem(float* gx, float* gy, float* params, int layers, cv::Mat &baseImage, float *cdata, float *hdata, float *img_sum_data);
+	void calcCostVol(float* k2k, cv::Mat &image);
 	void cacheGValue2(cv::Mat &bgray, float theta);
 	void updateQD(float epsilon, float theta, float sigma_q, float sigma_d);
 	void updateA ( float lambda, float theta );
@@ -232,18 +230,18 @@ public:
 		cl_event readEvt;
 		cl_int status;
 														cout<<"\nReadOutput: &outmat="<<&outmat<<", buf_mem="<<buf_mem<<", data_size="<<data_size<<", offset="<<offset<<"\t"<<flush;
-		status = clEnqueueReadBuffer(m_queue,
-											buf_mem,
-											CL_FALSE,
-											offset,
-											data_size,
-											outmat,
-											0,
-											NULL,
-											&readEvt);
+		status = clEnqueueReadBuffer(dload_queue,			// command_queue
+											buf_mem,		// buffer
+											CL_FALSE,		// blocking_read
+											offset,			// offset
+											data_size,		// size
+											outmat,			// pointer
+											0,				// num_events_in_wait_list
+											NULL,			// event_waitlist
+											&readEvt);		// event
 														if (status != CL_SUCCESS) { cout << "\nclEnqueueReadBuffer(..) status=" << checkerror(status) <<"\n"<<flush; exit_(status);} 
 															else if(verbosity>0) cout <<"\nclEnqueueReadBuffer(..)"<<flush;
-		status = clFlush(m_queue);						if (status != CL_SUCCESS) { cout << "\nclFlush(m_queue) status = " 		<< checkerror(status) <<"\n"<<flush; exit_(status);} 
+		status = clFlush(dload_queue);					if (status != CL_SUCCESS) { cout << "\nclFlush(m_queue) status = " 		<< checkerror(status) <<"\n"<<flush; exit_(status);} 
 															else if(verbosity>0) cout <<"\nclFlush(..)"<<flush;
 		status = clWaitForEvents(1, &readEvt); 			if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);} 
 															else if(verbosity>0) cout <<"\nclWaitForEvents(..)"<<flush;

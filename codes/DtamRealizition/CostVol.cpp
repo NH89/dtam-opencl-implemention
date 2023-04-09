@@ -78,13 +78,11 @@ CostVol::CostVol(
 	cv::Mat 	R,
 	cv::Mat 	T,
 	cv::Mat 	_cameraMatrix,
-	boost::filesystem::path 	out_path,
-	Json::Value obj_,
-	int			verbosity_
-) : cvrc(out_path, verbosity_), R(R), T(T)  // constructors for member classes //
+	Json::Value obj_
+) : cvrc(obj_), R(R), T(T)  // constructors for member classes //
 {
 	obj = obj_;
-	verbosity = verbosity_;
+	verbosity = obj["verbosity"].asInt(); 
 																							if(verbosity>0) cout << "CostVol_chk 0\n" << flush;
 																							/*
 																							*  Inverse of a transformation matrix:
@@ -226,39 +224,37 @@ CostVol::CostVol(
 	hit      		= Mat::zeros(layers, rows * cols, CV_32FC1);
 	hit      		= obj["initialWeight"].asFloat();
 	img_sum_data 	= Mat::zeros(layers, rows * cols, CV_32FC1);
-	
-	FLATALLOC(_a);	// used for CostVol::GetResult(..)										// (ii) one allocation of buffers for data. -> DownLoadAndSave(..) offload & display use temp Mat objects.
-	FLATALLOC(_gx); // used for line 277 cvrc.allocatemem(...)								// #define FLATALLOC(n) n.create(rows, cols, CV_32FC1); n.reshape(0, rows);
-	FLATALLOC(_gy);
+																							// (ii) one allocation of buffers for data. -> DownLoadAndSave(..) offload & display use temp Mat objects.	
+	_a.create (rows, cols, CV_32FC1); _a.reshape (0, rows);									// used for CostVol::GetResult(..)	
+	_gx.create(rows, cols, CV_32FC1); _gx.reshape(0, rows);
+	_gy.create(rows, cols, CV_32FC1); _gy.reshape(0, rows);
 	_gx = _gy   = 1;
 	cvrc.width  = cols;
 	cvrc.height = rows;
 
-	image.copyTo(baseImage);
-	cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
-	baseImageGray 	= baseImageGray.reshape(0, rows);										// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
-
-	float *to_ptr=(float*)img_sum_data.data,  *from_ptr=(float*)baseImageGray.data;
+	image.copyTo(baseImage); cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
+	baseImageGray = baseImageGray.reshape(0, rows);											// baseImageGray used by CostVol::cacheGValues( cvrc.cacheGValue (baseImageGray));
+	float *to_ptr =(float*)img_sum_data.data,  *from_ptr=(float*)baseImageGray.data;
 	for (int i=0; i<img_sum_data.total(); i++) to_ptr[i]=from_ptr[i%baseImageGray.total()];	// tile baseImageGray onto img_sum_data.
 
 	count      = 0;
-	//thetaMin   = 9.9e-8;						//1.0e-4;	//1.0*off;						// DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
+	//thetaMin   = 9.9e-8;						// 1.0e-4;	//1.0*off;						// DTAM paper NB theta depends on (i)photometric scale, (ii)num layers, (iii) inv_depth scale
 	thetaStart = obj["thetaStart"].asFloat();	// 0.2;		//0.2;	//200.0*off;			// DTAM paper & DTAM_Mapping has Theta_start = 0.2
-	thetaStep  = obj["thetaStep"].asFloat();	// 0.87;			//0.97;
-	epsilon    = obj["epsilon"].asFloat();		//  1.0e-4;			//.1*off;
-	lambda     = obj["lambda"].asFloat();		//  1.0;	//1.0;	//.001 / off;			// DTAM paper: lambda = 1 for 1st key frame, and 1/(1+0.5*min_depth) thereafter
+	thetaStep  = obj["thetaStep"].asFloat();	// 0.87;	//0.97;
+	epsilon    = obj["epsilon"].asFloat();		// 1.0e-4;	//.1*off;
+	lambda     = obj["lambda"].asFloat();		// 1.0;		//1.0;	//.001 / off;			// DTAM paper: lambda = 1 for 1st key frame, and 1/(1+0.5*min_depth) thereafter
 	theta      = thetaStart;
 	old_theta  = theta;
 	
-	cvrc.params[LAMBDA]			=  obj["lambda"].asFloat();										//lambda;		///   __kernel void UpdateA2
-	computeSigmas(epsilon, theta, obj["L"].asFloat() );																// lambda, theta, sigma_d, sigma_q set by CostVol::computeSigmas(..) in CostVol.h, called in CostVol::updateQD() below.
-	cvrc.params[BETA_G]			=  obj["beta_g"].asFloat();										//1.5;														// DTAM paper : beta=0.001 while theta>0.001, else beta=0.0001
-	cvrc.params[ALPHA_G]		=  obj["alpha_g"].asFloat()* pow(256,cvrc.params[BETA_G]);		//0.015 * pow(256,cvrc.params[BETA_G]);					///  __kernel void CacheG4, with correction for CV_8UC3 -> CV_32FC3
-	cvrc.params[EPSILON]		=  obj["epsilon"].asFloat();									//0.1;			///  __kernel void UpdateQD					// epsilon = 0.1
-	cvrc.params[SIGMA_Q]		=  sigma_q;// obj["sigma_q"].asFloat();//0.0559017;				// sigma_q = 0.0559017
+	cvrc.params[LAMBDA]			=  obj["lambda"].asFloat();									// lambda;		// __kernel void UpdateA2
+	computeSigmas(epsilon, theta, obj["L"].asFloat() );										// lambda, theta, sigma_d, sigma_q set by CostVol::computeSigmas(..) in CostVol.h, called in CostVol::updateQD() below.
+	cvrc.params[BETA_G]			=  obj["beta_g"].asFloat();									// 1.5;											// DTAM paper : beta=0.001 while theta>0.001, else beta=0.0001
+	cvrc.params[ALPHA_G]		=  obj["alpha_g"].asFloat()* pow(256,cvrc.params[BETA_G]);	// 0.015 * pow(256,cvrc.params[BETA_G]);		// __kernel void CacheG4, with correction for CV_8UC3 -> CV_32FC3
+	cvrc.params[EPSILON]		=  obj["epsilon"].asFloat();								// 0.1;			// __kernel void UpdateQD		// epsilon = 0.1
+	cvrc.params[SIGMA_Q]		=  sigma_q;													// sigma_q = 0.0559017
 	cvrc.params[SIGMA_D]		=  sigma_d;
 	cvrc.params[THETA]			=  theta;
-	cvrc.params[SCALE_EAUX]		=  obj["scale_E_aux"].asFloat();								//10000;		// from DTAM_Mapping input/json/icl_numin.json    //1.0;
+	cvrc.params[SCALE_EAUX]		=  obj["scale_E_aux"].asFloat();							//10000;		// from DTAM_Mapping input/json/icl_numin.json    //1.0;
 
 	cvrc.allocatemem( (float*)_gx.data, (float*)_gy.data, cvrc.params, layers, baseImage, (float*)costdata.data, (float*)hit.data, (float*)img_sum_data.data );
 																							if(verbosity>0) cout << "CostVol_chk 6\n" << flush;
@@ -272,7 +268,8 @@ void CostVol::computeSigmas(float epsilon, float theta, float L){
 
 void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T) 
 {
-																						if(verbosity>0) cout << "\nupdateCost chk0," << flush;			// assemble 4x4 cam2cam homogeneous reprojection matrix:   cam2cam = K(4x4) * RT(4x4) * k^-1(4x4)
+																						if(verbosity>0) cout << "\nupdateCost chk0," << flush;			
+																						// assemble 4x4 cam2cam homogeneous reprojection matrix:   cam2cam = K(4x4) * RT(4x4) * k^-1(4x4)
 	Mat image;																			// NB If K changes, then : K from current frame (to be sampled), and K^-1 from keyframe.
 	_image.copyTo(image);
 	cv::Matx44f K = cv::Matx44f::zeros();												// NB currently "cameraMatrix" found by convertAhandPovRay, called by fileLoader
