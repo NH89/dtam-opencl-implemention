@@ -1,11 +1,11 @@
 #include "CostVol.h"
 #include <fstream>
-#include <iomanip>   // std::setprecision, std::setw
+#include <iomanip>   // for std::setprecision, std::setw
 
 using namespace cv;
 using namespace std;
 
-#define FLATALLOC(n) n.create(rows, cols, CV_32FC1); n.reshape(0, rows);
+//#define FLATALLOC(n) n.create(rows, cols, CV_32FC1); n.reshape(0, rows);
 
 CostVol::~CostVol()
 {
@@ -79,7 +79,7 @@ CostVol::CostVol(
 	cv::Mat 	T,
 	cv::Mat 	_cameraMatrix,
 	Json::Value obj_
-) : cvrc(obj_), R(R), T(T)  // constructors for member classes //
+) : cvrc(obj_), R(R), T(T)  																// constructors for member classes //
 {
 	obj = obj_;
 	verbosity = obj["verbosity"].asInt(); 
@@ -268,15 +268,13 @@ void CostVol::computeSigmas(float epsilon, float theta, float L){
 }
 
 void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T) 
-{
-																						if(verbosity>0) cout << "\nupdateCost chk0," << flush;			
+{																						if(verbosity>0) cout << "\nupdateCost chk0," << flush;			
 																						// assemble 4x4 cam2cam homogeneous reprojection matrix:   cam2cam = K(4x4) * RT(4x4) * k^-1(4x4)
 	Mat image;																			// NB If K changes, then : K from current frame (to be sampled), and K^-1 from keyframe.
 	_image.copyTo(image);
 	cv::Matx44f K = cv::Matx44f::zeros();												// NB currently "cameraMatrix" found by convertAhandPovRay, called by fileLoader
 	for (int i=0; i<9; i++) K.operator()(i/3,i%3) = cameraMatrix.at<float>(i/3,i%3);	// TODO later, restructure mainloop to build costvol continuously...
 	K.operator()(3,3)  = 1;
-
 																						if(verbosity>1) {
 																							cout << "\nupdateCost chk1," << flush;
 																							cout << "\ncameraMatrix.size="<<cameraMatrix.size<<"\n"<<flush;   				// R.size=3 x 3,	T.size=3 x 1
