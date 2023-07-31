@@ -10,3 +10,4 @@ codes/DtamRealizition/.*
 codes/output/*
 transfered_from_WS/*
 build/*
+DTAM_opencl_data/*

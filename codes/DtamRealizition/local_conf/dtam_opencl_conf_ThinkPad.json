@@ -4,7 +4,7 @@
     "cameraMatrix":[481.20,   0.0,  319.5, 	0.0,  480.0,  239.5, 	0.0,    0.0,    1.0],
     "":"",
     "out_path":"",                                                      // Can add either relative or absolute path. NB Uses BoostFileSystem for OS portablitity.
-    "data_path":"/home/nick/Programming/ComputerVision/DataSets/",      // /home/hockingsn/Programming/computer_vision_data/   // /home/nick/programming/ComputerVision/DataSets
+    "data_path":"/media/hockingsn/Backup/DoNotDelete/DataSets/computer_vision_data/",  ///home/nick/Programming/ComputerVision/DataSets/  // /home/hockingsn/Programming/computer_vision_data/   // /home/nick/programming/ComputerVision/DataSets
     "data_file":"ahanda-icl/Trajectory_for_Variable_Frame-Rate/200fps/200fps_GT_archieve",
     "data_file_increment":1,
     "data_file_offset":0,       //475;//10;//46;//462;//380;//0;
@@ -29,8 +29,9 @@
     "L":4.0,                                                            // used in CostVol computeSigmas
     "scale_E_aux":10000,        //1.0;                                  // from DTAM_Mapping input/json/icl_numin.json
     "":"",
-    "kernel_filepath":"../DtamRealizition/DTAM_kernels2.cl"             // need file paths for building kernels
-    "opencl_platform":0,        // ThinkPad 2, Clevo 0, WS 0 or 1       // need platform & device GPU choices 
+    "kernel_filepath":"/home/hockingsn/Programming/OpenCV/MySLAM/dtam-opencl-implemention/codes/DtamRealizition/DTAM_kernels2.cl",      // need file paths for building kernels         
+     "":"",                     //../DtamRealizition/DTAM_kernels2.cl        // ../DTAM_kernels2.cl
+    "opencl_platform":2,        // ThinkPad 2, Clevo 0, WS 0 or 1       // need platform & device GPU choices 
     "opencl_device":0,
     "":"",
     "":"",

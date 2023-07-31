@@ -32,6 +32,8 @@ int main(int argc, char *argv[])
 	int incr 	= obj["data_file_increment"].asUInt();
 	int offset 	= obj["data_file_offset"].asUInt();							// better location in this dataset for translation for paralax flow.
 	cout << "incr="<<incr<< endl;
+	cout << "ss0.str()=" <<ss0.str()<<endl<<flush;
+	
 	for (int i =0; i < imagesPerCV; i++) {									// Load images & data from file into c++ vectors
 		loadAhanda( ss0.str(),
 					(i*incr)+offset,

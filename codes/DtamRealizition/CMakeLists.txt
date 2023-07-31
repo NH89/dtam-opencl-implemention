@@ -73,7 +73,6 @@ add_executable(DTAM-OpenCL
         CostVol.h
         fileLoader.cpp
         fileLoader.hpp
-        #LoadFiles.cpp
         RunCL.cpp
         RunCL.h
         utils.hpp

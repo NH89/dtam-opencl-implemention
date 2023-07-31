@@ -103,7 +103,7 @@ void RunCL::createFolders(){
 	if(verbosity>0) {
 		cout << "\nRunCL::createFolders() chk1\n";
 		cout << "KEY\tPATH\n";														// print the folder paths
-		for (auto itr=paths.begin(); itr!=paths.end(); ++itr) { cout<<"First:["<< itr->first << "]\t:\t Second:"<<itr->second<<"\n"; }
+		for (auto itr=paths.begin(); itr!=paths.end(); ++itr) { cout<<"First:["<< itr->first << "] \t:\t Second:"<<itr->second<<"\n"; }
 		cout<<"\npaths.at(\"basemem\")="<<paths.at("basemem")<<"\n"<<flush;
 	}
 }
@@ -377,7 +377,7 @@ void RunCL::calcCostVol(float* k2k,  cv::Mat &image)
 	stringstream ss;
 	ss << "calcCostVol";
 	size_t old_image_size_bytes = image_size_bytes;
-	image_size_bytes 			= image.total() * image.elemSize() ;																		// num array elements * bytes per element all channels
+	image_size_bytes 			= image.total() * image.elemSize() ;																			// num array elements * bytes per element all channels
 	costVolCount++;
 	keyFrameCount++;
 	if (costVolCount > 1 && old_image_size_bytes!=image_size_bytes){cout << "\n\nMismatch 'image_size_bytes' !!!\n"<<flush; exit_(0); }
@@ -426,7 +426,7 @@ void RunCL::calcCostVol(float* k2k,  cv::Mat &image)
 	status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " << checkerror(status) <<"\n"<<flush; exit_(status);}
 	status = clFinish(m_queue); 			if (status != CL_SUCCESS)	{ cout << "\nclFinish(m_queue)="		 <<checkerror(status)  <<"\n"<<flush; exit_(status);}
 
-	res    = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); 										// ####### cost_kernel ############
+	res    = clEnqueueNDRangeKernel(m_queue, cost_kernel, 1, 0, &global_work_size, 0, 0, NULL, &ev); 											// ####### cost_kernel ############
 	if (res != CL_SUCCESS)	{ cout << "\nclEnqueueNDRangeKernel res = " << checkerror(res) <<"\n"<<flush; exit_(res);}
 	status = clFlush(m_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush(m_queue) status = " <<checkerror(status)  <<"\n"<<flush; exit_(status);}
 	status = clWaitForEvents (1, &ev);		if (status != CL_SUCCESS)	{ cout << "\nclWaitForEventsh(1, &ev)="	 <<checkerror(status)  <<"\n"<<flush; exit_(status);}
@@ -538,7 +538,7 @@ void RunCL::updateA(float lambda, float theta)
 	status = clEnqueueWriteBuffer(uload_queue,  param_buf, CL_FALSE, 0, 16 * sizeof(float), params, 0, NULL, &writeEvt);						// WriteBuffer param_buf ##########
 	if (status != CL_SUCCESS)	{ cout << "\nstatus = " << checkerror(status) <<"\n"<<flush; cout << "Error: \nRunCL::updateA_chk0\n" << endl; exit_(status);}
 																																			else if(verbosity>0) {cout << "\nRunCL::updateA_chk0\t\tlayers="<< params[LAYERS] <<" \n" << flush;}
-	status = clFlush(uload_queue); 					if (status != CL_SUCCESS)	{ cout << "\nclFlush status = " << status << checkerror(status) <<"\n"<<flush; exit_(status);}
+	status = clFlush(uload_queue); 				if (status != CL_SUCCESS)	{ cout << "\nclFlush status = " << status << checkerror(status) <<"\n"<<flush; exit_(status);}
 	status = waitForEventAndRelease(&writeEvt); if (status != CL_SUCCESS)	{ cout << "\nwaitForEventAndRelease status = "<<status<<checkerror(status)<<"\n"<<flush; exit_(status);}
 
 	stringstream ss;

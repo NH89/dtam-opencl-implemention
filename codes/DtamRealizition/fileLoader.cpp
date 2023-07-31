@@ -32,8 +32,10 @@ void loadAhanda( std::string rootpath,
     }
     if(verbosity_>0) {
       cout << "\nfilepath: "<< string(rootpath) << "\n" << flush;
-      cout << "\n" << txt[imageNumber].c_str();
-      cout << "\n" << png[imageNumber].c_str();
+    }
+    if(verbosity_>0) {  
+      cout << "\n" << txt[imageNumber].c_str()  << flush;
+      cout << "\n" << png[imageNumber].c_str()  << flush;
       cout << "\n" << depth[imageNumber].c_str();
       cout << "\n" << flush;
     }

@@ -144,7 +144,8 @@ CostVol::CostVol(
 	float fy   =  K.operator()(1,1);
 	float skew =  K.operator()(0,1);
 	float cx   =  K.operator()(0,2);
-	float cy   =  K.operator()(1,2);														if(verbosity>0) {
+	float cy   =  K.operator()(1,2);
+																							if(verbosity>0) {
 																								cout<<"\nfx="<<fx <<"\nfy="<<fy <<"\nskew="<<skew <<"\ncx="<<cx <<"\ncy= "<<cy;
 																								cout << "\n\nCostVol_chk 5\n" << flush;
 																							}
@@ -369,7 +370,7 @@ void CostVol::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T)
 																						}
 																						if(verbosity>0) cout << "\nupdateCost chk4," << flush;
 	assert(baseImage.isContinuous() ); 	// TODO move these assertions to the constructor ? //  returns true if the matrix elements are stored continuously without gaps at the end of each row.
-	image = image.reshape(0, rows);									// line 85: rows = image.rows, i.e. num rows in the base image. If the parameter is 0, the number of channels remains the same
+	image = image.reshape(0, rows);														// line 85: rows = image.rows, i.e. num rows in the base image. If the parameter is 0, the number of channels remains the same
 	float k2k[16];
 	for (int i=0; i<16; i++) { k2k[i] = cam2cam.operator()(i/4, i%4); }
 	cvrc.calcCostVol(k2k, image);														// calls calcCostVol(..) #################

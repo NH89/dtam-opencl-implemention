@@ -51,6 +51,7 @@ public:
 	cl_kernel			cost_kernel, cache3_kernel, cache4_kernel, updateQD_kernel, updateA_kernel;
 	cl_mem				basemem, imgmem, cdatabuf, hdatabuf, k2kbuf, dmem, amem, basegraymem, gxmem, gymem, g1mem, qmem, lomem, himem, param_buf, img_sum_buf;
 
+	
 	size_t  			global_work_size, local_work_size, image_size_bytes;
 	bool 				gpu, amdPlatform;
 	cl_device_id 		deviceId;
@@ -245,6 +246,8 @@ public:
 															else if(verbosity>0) cout <<"\nclFlush(..)"<<flush;
 		status = clWaitForEvents(1, &readEvt); 			if (status != CL_SUCCESS) { cout << "\nclWaitForEvents status="			<< checkerror(status) <<"\n"<<flush; exit_(status);} 
 															else if(verbosity>0) cout <<"\nclWaitForEvents(..)"<<flush;
+															
+														cout << "\n\nReadOutput finished\n\n" << flush;
 	}
 };
 

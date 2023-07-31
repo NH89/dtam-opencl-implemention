@@ -40,7 +40,7 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	__global float* hi,			//6
 	__global float* a,			//7
 	__global float* d,			//8
-	__constant float* params,	//9 pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step, threshold
+	__constant float* params,	//9  pixels, rows, cols, layers, max_inv_depth, min_inv_depth, inv_d_step, threshold
 	__global float* img_sum)	//10
 {
 	int global_id = get_global_id(0);
