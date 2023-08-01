@@ -74,6 +74,13 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 	//float h/z  = k2k[12]*u + k2k[13]*v + k2k[14]*1; // +k2k[15]/z
 	float uh3, vh3, wh3;
 
+	if (global_id==0){ 
+		printf("\n__kernel void DepthCostVol(): k2k= ( %f,  %f,  %f,  %f, )( %f,  %f,  %f,  %f, )( %f,  %f,  %f,  %f, )( %f,  %f,  %f,  %f, )",\
+		k2k[0], k2k[1], k2k[2], k2k[3], k2k[4], k2k[5], k2k[6], k2k[7], k2k[8], k2k[9], k2k[10], k2k[11], k2k[12], k2k[13], k2k[14], k2k[15] \
+		);
+		printf("\n__kernel void DepthCostVol(): uh2=%f, vh2=%f  , wh2=%f ", uh2, vh2, wh2 );
+	}
+	
 	// cost volume loop  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	#define MAX_LAYERS 256 //64
 	float cost[MAX_LAYERS];
@@ -90,6 +97,10 @@ __kernel void BuildCostVolume2(						// called as "cost_kernel" in RunCL.cpp
 		//if(u==70 && v==470)printf("\n(inv_depth=%f,   ",inv_depth);
 		int_u2 = ceil(u2-0.5);		// nearest neighbour interpolation
 		int_v2 = ceil(v2-0.5);
+		
+		uint read_index_new = (int_v2*cols + int_u2)*3;
+		if (global_id==0) printf("\n__kernel void DepthCostVol(): pixels=%i, read_index_new=%i, cv_idx=%i  ###  depth layer=%i, inv_depth=%f, inv_d_step=%f,  min_inv_depth=%f,  uh3=%f,  vh3=%f,  wh3=%f,  u2=%f,  v2=%f,  int_u2=%i,  int_v2=%i  ", \
+			pixels, read_index_new, cv_idx,    layer, inv_depth, inv_d_step, min_inv_depth, uh3, vh3, wh3, u2, v2, int_u2, int_v2 );
 
 		if ( !((int_u2<0) || (int_u2>cols-1) || (int_v2<0) || (int_v2>rows-1)) ) {  	// if (not within new frame) skip
 			c=img[(int_v2*cols + int_u2)*3];											// nearest neighbour interpolation
